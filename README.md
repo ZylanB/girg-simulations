@@ -3,12 +3,12 @@ The two main files are background_functions and drawing_functions, both names ar
 Any functions that have to do with generating the graphs, running the simulations, or really anything that doesnt generate an image is in background_functions.
 Code that generates pictures through matplotlib is all in drawing_functions, where there are multiple ways of generating and saving heatmaps, geodesics images, and some other images I've made in the past. 
 
-There is also a gowalla folder with a gowalla.py file, this includes all my code used for the gowalla dataset and also some .pickle files which i created to save time working with the data from the Gowalla dataset. I didn't really clean this up so apologies if it is kind of messy. \
+There is also a gowalla folder with a gowalla.py file, this includes all my code used for the gowalla dataset and also some .pickle files which i created to save time working with the data from the Gowalla dataset. I didn't really clean this up so apologies if it is kind of messy. 
 
 Below ill write some quick explanations about how the functions are usually structured, if needed I can write more extensive documentation. There are also comments throughout the code with notes on how certain functions work. 
 
 ### Argument Explanations
-Most functions here will use the same arguments so here is a quick overview of what the most common ones mean: \
+Most functions here will use the same arguments so here is a quick overview of what the most common ones mean: 
 ##### Graph Generation 
 `lim` / `n` / `size`: These arguments determine the size of the graph, usually when 'lim' is used it is for a Lattice-type underlying vertex set. Where lim indicates the size of the x/y-axis. For example lim = 100 creates a lattice of 101x101, also `lim` has to be an even number. `n` is usually used when the underlying vertex set is a PPP. `size` is mostly used in drawing_functions when there is ambiguity on when Z^d or a PPP will be used. \
 `d`: The dimension on which the vertex set is created. \
