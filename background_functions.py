@@ -310,11 +310,24 @@ def circlePeriod(g,pos,infs,r,eps = 0.5,vertex_set = "Z2",origin_index = None):
     return inf_time_set
 
 # This returns the median infection time of nodes at a distance r of the origin_index
-def medianBorder(g,pos,infs,r,noInfecs):
+def medianBorder(g,pos,infs,r,noInfecs,vertex_set = "Z2", origin_index = None):
     vertex_set_r = []
-    origin_index = 0
-    og_pos_x = pos[origin_index][0]
-    og_pos_y = pos[origin_index][1]
+    if origin_index is None:   
+        match vertex_set:
+            case "Z1":
+                lim = (g.num_vertices()/2)
+                origin_index = lim/2
+                og_pos_x = origin_index
+            case "Z2":
+                lim = (sqrt(g.num_vertices())-1)
+                origin_index = (lim+1)*(lim/2) + (lim/2)
+                og_pos_x = pos[origin_index][0]
+                og_pos_y = pos[origin_index][1]
+            case "PPP": 
+                lim = sqrt(g.num_vertices())
+                origin_index = 0
+                og_pos_x = pos[origin_index][0]
+                og_pos_y = pos[origin_index][1]
     eps = 0.05
     for u in g.vertices():
         dist = sqrt((pos[u][0]-og_pos_x)**2 + (pos[u][1] - og_pos_y)**2)
@@ -327,7 +340,7 @@ def medianBorder(g,pos,infs,r,noInfecs):
     return np.median(inf_time_set)
 
 # This returns a list of different distances r, and a list of the median times at these r
-def radiusCoords(g,pos,infs,noInfecs,r_num,vertex_set = "Z2"):
+def radiusCoords(g,pos,infs,noInfecs,r_num,vertex_set = "Z2",origin_index = None):
     start_time = time.time()
 
     match vertex_set:
@@ -343,7 +356,7 @@ def radiusCoords(g,pos,infs,noInfecs,r_num,vertex_set = "Z2"):
     median_times = []
 
     for r in r_list: 
-        med = medianBorder(g,pos,infs,r,noInfecs)
+        med = medianBorder(g,pos,infs,r,noInfecs,vertex_set,origin_index)
         median_times.append(med)
 
     print("Calculating Median Infection Time at Radii r: --- %s seconds ---" % (time.time() - start_time))

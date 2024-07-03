@@ -199,7 +199,7 @@ def radiusTime(size,d,tau,alpha,mu,r_num, vertex_set = "Z2", marker = "", savefi
             g,pos,st,w,L_rv = bf.PPPGirg(size,d,tau,alpha,deg,seed)
     
     infs,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu,vertex_set,method,origin_index)
-    r_list, median_times = bf.radiusCoords(g,pos,infs,noInfecs,r_num,vertex_set)
+    r_list, median_times = bf.radiusCoords(g,pos,infs,noInfecs,r_num,vertex_set,origin_index)
 
     fig = plt.figure(figsize=(14,14))
     plt.plot(r_list,median_times)
