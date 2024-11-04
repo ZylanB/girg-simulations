@@ -15,81 +15,6 @@ from PIL import Image
 
 path = '/home/zbenj/.local/python/GIRGs/Datasets/Gowalla/gow_graph_mode.pickle'
 
-
-'''
-
-gow_checkins_txt = open("/root/python/Gowalla_totalCheckins.txt",'r')
-gow_checkins_string = gow_checkins_txt.readlines()
-check_in_data = {}
-for x in gow_checkins_string:
-    x = x.replace("\n","")
-    x_split = x.split("\t")
-    if int(x_split[0]) not in check_in_data.keys():
-        check_in_data[int(x_split[0])] = [[round(float(x_split[2]),2)],[round(float(x_split[3]),2)]]
-    if int(x_split[0]) in check_in_data.keys():
-        check_in_data[int(x_split[0])][0].append(round(float(x_split[2]),2))
-        check_in_data[int(x_split[0])][1].append(round(float(x_split[3]),2))
-gow_checkins_txt.close()
-
-
-pos = {}
-for key in check_in_data.keys():
-    print(key)
-    values_x, counts_x = np.unique(check_in_data[key][0], return_counts = True)
-    index = np.where(check_in_data[key][0] == values_x[np.argmax(counts_x)])[0][0]
-    pos[key] = [check_in_data[key][0][index],check_in_data[key][1][index]]
-
-with open('gow_pos_mode.pickle','wb') as outfile:
-    pickle.dump(pos,outfile,protocol=pickle.HIGHEST_PROTOCOL)
-breakpoint()
-
-pos_r = {}
-for key in check_in_data.keys():
-    index = np.random.randint(0,len(check_in_data[key][0]))
-    pos_r[key] = [check_in_data[key][0][index],check_in_data[key][1][index]]
-
-with open('gow_pos_random.pickle','wb') as outfile:
-    pickle.dump(pos_r,outfile,protocol=pickle.HIGHEST_PROTOCOL)
-
-
-with open('gow_pos_random.pickle','rb') as data:
-    gow_pos_dict = pickle.load(data)
-
-gow_edges_txt = open("/root/python/Gowalla_edges.txt",'r')
-gow_edges_string = gow_edges_txt.readlines()
-gow_edge_list= []
-for x in gow_edges_string:
-    x = x.replace("\n","")
-    if int(x.split('\t')[0]) in gow_pos_dict.keys() and int(x.split('\t')[1]) in gow_pos_dict.keys():
-        gow_edge_list.append((int(x.split('\t')[0]),int(x.split('\t')[1])))
-gow_edges_txt.close()
-
-def setGraph(edges,pos_dict):
-    start_time = time.time()
-    g = gt.Graph(directed = False)
-    g.add_vertex(196590)
-    status = g.new_vertex_property("int")
-    id = g.new_vertex_property("int")
-    del_list = []
-    for u in g.vertices():
-        id[u] = int(u)
-        if id[u] not in pos_dict.keys():
-            del_list.append(u)
-        status[u] = 0
-    g.add_edge_list(gow_edge_list)
-    g.remove_vertex(del_list,fast = True)        
-    
-    print("--- %s seconds ---" % (time.time() - start_time))
-
-    return g,status,id
-
-g,st,id = setGraph(gow_edge_list,gow_pos_dict)
-breakpoint()
-with open('gow_graph_mode_random.pickle','wb') as outfile:
-    pickle.dump([g,st,id,gow_pos_dict],outfile,protocol=pickle.HIGHEST_PROTOCOL)
-    
-'''
-
 areas = {"US": [(60,105),(37,90)],"Europe": [(80,115),(145,200)]}
 
 def L_exponentials(g):
@@ -112,10 +37,10 @@ def new_infectionSpread(g,pos,id,status,L_rv,mu,zeta = 0,method = 1,ratio = 1,or
         if i % 1000000 == 0:
             print(i)
         match method:
-            case 1: 
+            case 1: #Just Spatial penalization
                 trans_cost[e] = L_rv[e]*(sqrt((pos[id[e.source()]][0] - pos[id[e.target()]][0])**2 + (pos[id[e.source()]][1] - pos[id[e.target()]][1])**2))**mu
-            case 2: 
-                trans_cost[e] = L_rv[e]*((sqrt((pos[id[e.source()]][0] - pos[id[e.target()]][0])**2 + (pos[id[e.source()]][1] - pos[id[e.target()]][1])**2))**mu)*((max(1,e.source().out_degree()-penalty)*(max(1,e.target().out_degree()-penalty)))**zeta)
+            case 2: #Spatial and Degree penalization
+                trans_cost[e] = L_rv[e]*((sqrt((pos[id[e.source()]][0] - pos[id[e.target()]][0])**2 + (pos[id[e.source()]][1] - pos[id[e.target()]][1])**2))**zeta)*((max(1,e.source().out_degree()-penalty)*(max(1,e.target().out_degree()-penalty)))**mu)
     #print("Edge Cost Simulation: --- %s seconds ---" % (time.time() - start_time))
     if origin_index is None:    
         origin_index = 316
@@ -154,11 +79,13 @@ def new_infectionSpread(g,pos,id,status,L_rv,mu,zeta = 0,method = 1,ratio = 1,or
             if status[u] == 0:
                 not_infected_vertices.append(u)
             status[u] = 0
-    #print("Infection Simulation: --- %s seconds ---" % (time.time() - start_time))
+    print("Infection Simulation: --- %s seconds ---" % (time.time() - start_time))
     #print("Steps = ", steps)
     return inf_nodes, trans_cost, not_infected_vertices
 
-def sortDistances(g,pos,id,origin = 6700):
+###### The following functions I wrote months ago so I do not know if they still work ######
+                   ######## Starts here ##########
+def sortDistances(g,pos,id,origin = 316):
     start_time = time.time()
     dist_list = []
     for u in g.vertices():
@@ -166,7 +93,6 @@ def sortDistances(g,pos,id,origin = 6700):
         dist_list.append([dist,u])
     print("Dist: --- %s seconds ---" % (time.time() - start_time))
     return dist_list
-
 
 def findInfectionPath(g,pos,id,infs,tc,v,origin_index = None):
     if origin_index is None:    
@@ -213,73 +139,7 @@ def radiusCoords(g,st,id,pos,Lrv,mu):
     print("--- %s seconds ---" % (time.time() - start_time))
     return r_list,median_times
 
-
-def checkAlpha(version):
-    with open('gow_graph_mode.pickle', 'rb') as data:
-        g,st,id,pos = pickle.load(data)
-    g,Lrv = L_exponentials(g)
-    x1,y1 = radiusCoords(g,st,id,pos,Lrv,0)
-    x2,y2 = radiusCoords(g,st,id,pos,Lrv,2)
-    fig, axis = plt.subplots(1,2, figsize=(15,11))
-    axis[0].plot(x1,y1)
-    axis[0].set_title("mu = 0")
-    axis[0].set_xlabel("|x|")
-    axis[0].set_ylabel("Dc(0,x)")
-    axis[1].plot(x2,y2)
-    axis[1].set_xlabel("|x|")
-    axis[1].set_ylabel("Dc(0,x)")
-    axis[1].set_title("mu = 2")
-    fig.savefig("alphaCheck_" + str(version) + ".png")
-    fig2, axis2 = plt.subplots(1,2, figsize=(15,11))
-    axis2[0].plot(x1,y1)
-    axis2[0].set_xlabel("|x|")
-    axis2[0].set_ylabel("Dc(0,x)")
-    axis2[1].plot(x2,np.log10(y2))
-    axis2[1].set_xlabel("|x|")
-    axis2[1].set_ylabel("log(Dc(0,x))")
-    axis2[0].set_title("mu = 0")
-    axis2[1].set_title("mu = 2")
-    fig2.savefig("alphaCheck_log_" + str(version) + ".png")
-
-
-def moransIndex(g,infs,lim): #DistanceDecay currently only works for k = 1 (rook definition of neighbors)
-    start_time = time.time()
-    tc_mean = (g.num_vertices() + 1)/2
-    big_N = g.num_vertices()
-    big_W = 0
-    first_sum = 0
-    bottom_sum = 0
-    for u in g.vertices():
-        u_neighbors = []
-        second_sum = 0
-        ind_u = infs[int(u)][0]  
-        if int(u) % (lim+1) == 0:
-            u_neighbors = [int(u)+lim,int(u)+1]
-        elif (int(u)+1) % (lim+1) == 0:
-            u_neighbors = [int(u)-1,int(u)-lim]
-        else:
-            u_neighbors = [int(u)-1,int(u)+1]
-        if (lim-floor(int(u)/(lim+1))) == lim:
-            u_neighbors.append(int(u)+(lim+1))
-            u_neighbors.append(int(u) + (lim + lim**2))
-        elif (lim - floor(int(u)/(lim+1))) == 0:
-            u_neighbors.append(int(u)-(lim+1))
-            u_neighbors.append(int(u)-(lim+lim**2))
-        else:
-            u_neighbors.append(int(u)+(lim+1))
-            u_neighbors.append(int(u)-(lim+1))
-        bottom_sum += (ind_u-tc_mean)**2
-        for v in u_neighbors:
-            weight = 1
-            big_W += weight
-            second_sum += weight*(ind_u - tc_mean)*(infs[int(v)][0] - tc_mean)
-        first_sum += second_sum
-    morans_Index = (big_N/big_W)*(first_sum/bottom_sum) 
-    print("Calculating Moran's I: --- %s seconds ---" % (time.time() - start_time))
-    return morans_Index
-
-
-def runGeodesics(mu_min,mu_max,num,version):
+def runGeodesics(mu_min,mu_max,num,version): 
 
     with open('gow_graph_mode.pickle', 'rb') as data:
         g,st,id,pos = pickle.load(data)
@@ -377,6 +237,8 @@ def runGeodesics(mu_min,mu_max,num,version):
     plt.plot(mu_list[0:136],hopcount_list[0:136])
     plt.savefig("HopCountZoomed_" + str(version) + ".png")
 
+###### The following functions I wrote months ago so I do not know if they still work ######
+                     ########## Ends here #############
 
 # Min max X-cords = -45.91, 70.08
 # Min Max Y-cords = -159.67, 176.92
@@ -433,7 +295,7 @@ def heatmapsGowalla(origin_index,mList,zList,marker,areas = {},tc_method = 1,met
         plt.ylim(y_lim_min,y_lim_max)
         plt.title("mu = " + str(mu_1) + " zeta = " + str(z_1))
         extent1 = ax1.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        #fig.savefig('linear'  +str(marker) + '.png',bbox_inches = extent1.expanded(1.3,1.4))
+        fig.savefig('linear'  +str(marker) + '.png',bbox_inches = extent1.expanded(1.3,1.4))
 
         ax2 = fig.add_subplot(2,2,2)
         plt.imshow(m_2,cmap=mymap,interpolation = 'spline16')
@@ -441,7 +303,7 @@ def heatmapsGowalla(origin_index,mList,zList,marker,areas = {},tc_method = 1,met
         plt.ylim(y_lim_min,y_lim_max)
         plt.title("mu = " + str(mu_2) + " zeta = " + str(z_2))
         extent2 = ax2.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        #fig.savefig('polynomial'  +str(marker) + '.png',bbox_inches = extent2.expanded(1.3,1.4))
+        fig.savefig('polynomial'  +str(marker) + '.png',bbox_inches = extent2.expanded(1.3,1.4))
 
         ax3 = fig.add_subplot(2,2,3)
         plt.imshow(m_3,cmap=mymap,interpolation = 'spline16')
@@ -449,7 +311,7 @@ def heatmapsGowalla(origin_index,mList,zList,marker,areas = {},tc_method = 1,met
         plt.ylim(y_lim_min,y_lim_max)      
         plt.title("mu = " + str(mu_3) + " zeta = " + str(z_3))
         extent3 = ax3.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        #fig.savefig('polylog'  +str(marker) + '.png',bbox_inches = extent3.expanded(1.3,1.27))
+        fig.savefig('polylog'  +str(marker) + '.png',bbox_inches = extent3.expanded(1.3,1.27))
 
         ax4 = fig.add_subplot(2,2,4)
         plt.imshow(m_4,cmap=mymap,interpolation = 'spline16')
@@ -457,7 +319,7 @@ def heatmapsGowalla(origin_index,mList,zList,marker,areas = {},tc_method = 1,met
         plt.ylim(y_lim_min,y_lim_max)       
         plt.title("mu = " + str(mu_4) + " zeta = " + str(z_4))
         extent4 = ax4.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        #fig.savefig('explosive'  +str(marker) + '.png',bbox_inches = extent4.expanded(1.3,1.27))
+        fig.savefig('explosive'  +str(marker) + '.png',bbox_inches = extent4.expanded(1.3,1.27))
         fig.savefig('allHeatmaps'  + str(marker) + area + '.png')
 
 def selectArea(g,id,pos,x_coords,y_coords):
@@ -516,21 +378,16 @@ def plotMaxDegrees(mu_min,mu_max,num,sample_amount,marker,area,origin_index):
     plt.plot(mu_list,np.log(degrees))
     plt.savefig("max_degrees_gowalla_log" + str(marker) + ".png")
 
-'''
-with open(path, 'rb') as data:
-        g,st,id,pos = pickle.load(data)
-options1 = []
-options2 = []
-for key in pos.keys():
-    if pos[key][0] > (80-46) and pos[key][0] < (84-46) and pos[key][1] > (72-160) and pos[key][1] < (75-160):
-        if g.vertex(id[key]).out_degree() > 10:
-            options1.append(key)
-    if pos[key][0] > (95-46) and pos[key][0] < (100-46) and pos[key][1] > (170-160) and pos[key][1] < (175-160):
-        if g.vertex(id[key]).out_degree() > 10:
-            options2.append(key)
-print(options1[0])
-print(options2[0])
-'''
+def findNodesInArea(x_min,x_max,y_min,y_max,min_degree): 
+    with open(path, 'rb') as data:
+            g,st,id,pos = pickle.load(data)
+    options1 = []
+    for key in pos.keys():
+        if pos[key][0] > y_min and pos[key][0] < y_max and pos[key][1] > x_min and pos[key][1] < x_max:
+            if g.vertex(id[key]).out_degree() > min_degree:
+                options1.append(key)
+    return options1
+
 
 def drawNXGraph(area):
     with open(path, 'rb') as data:
@@ -571,25 +428,7 @@ def epidemicCurve(mu,zeta,origin_index):
         I_t.append(sum(1 for v in infs.values() if v[1] <= t))
     return t_points,I_t
 
-def show(mList,zList,origin_index):
-    mu_1, mu_2, mu_3, mu_4 = mList[0],mList[1],mList[2],mList[3]
-    z_1, z_2, z_3, z_4 = zList[0],zList[1],zList[2],zList[3]
-    x1,y1 = epidemicCurve(mu_1,z_1,origin_index)
-    x2,y2 = epidemicCurve(mu_2,z_2,origin_index)
-    x3,y3 = epidemicCurve(mu_3,z_3,origin_index)
-    x4,y4 = epidemicCurve(mu_4,z_4,origin_index)
-    plt.plot(np.log(x1),np.log(y1), label = ("mu = " + str(mu_1) +" zeta = " + str(z_1)))
-    plt.show()
-    plt.plot(np.log(x2),np.log(y2), label = ("mu = " + str(mu_2) +" zeta = " + str(z_2)))
-    plt.show()
-    plt.plot(np.log(x3),np.log(y3), label = ("mu = " + str(mu_3) +" zeta = " + str(z_3)))
-    plt.plot(np.log(x4),np.log(y4), label = ("mu = " + str(mu_4) +" zeta = " + str(z_4)))
-    plt.legend()
-    plt.show()
-    plt.savefig("waaaaaa.png")
-
-
-def degDist(marker,log = False): 
+def degDist(marker,log = False): #includes linear regression 
     start_time = time.time()
     with open(path, 'rb') as data:
         g,st,id,pos = pickle.load(data)
@@ -624,8 +463,6 @@ def degDist(marker,log = False):
 
     print("Time: --- %s minutes ---" % (time.time() - start_time))
 
-
-
 def edgeLengthDist():
     with open(path, 'rb') as data:
         g,st,id,pos = pickle.load(data)
@@ -644,8 +481,8 @@ def edgeLengthDist():
     plt.title("amount of edges with length > l with removal of high weight vertices (> e^4)")
     plt.savefig("edge_length_dist_log_cml_pruned.png")
 
+def mapDraw(): #this needs to be fixed, i have the correct code somewhere else which i will add soon, also still work in progress because i need to add heatmap to it
 
-def mapDraw():
     with open('gow_graph_mode_mode.pickle', 'rb') as data:
             g,st,id,pos = pickle.load(data)
 
@@ -678,11 +515,10 @@ def mapDraw():
     plt.imshow(image)  
     plt.scatter(shifted_x,shifted_y,s=0.3,c='r')
 
-
     plt.axis('off')  
     plt.savefig("map_nodes.png")
 
-def moransI(g,pos,id,infs,noinfecs):
+def moransI(g,pos,id,infs,noinfecs): #is somehow wrong but i dont know why yet
     start_time = time.time()
     tc_mean = (g.num_vertices()+1)/2
     n = g.num_vertices()
@@ -709,33 +545,5 @@ def moransI(g,pos,id,infs,noinfecs):
     print("Calculating Moran's I: --- %s seconds ---" % (time.time() - start_time))
     return (n/w)*(upper_sum/lower_sum)
 
-with open(path, 'rb') as data:
-    g,st,id,pos = pickle.load(data)
 
-g, lrv = L_exponentials(g)
-for mu in [0,7,1.1,1.7,1.9]:
-    infs,tc,noninfecs = new_infectionSpread(g,pos,id,st,lrv,mu)
-    print(moransI(g,pos,id,infs,noninfecs))
-
-
-
-
-    
-
-
-
-
-
-
-
-
-#we find 316 for first big cluster and 164 for second big cluster with this
-
-#plotMaxDegrees(0,3,100,5000,"_europe",areas["Europe"],origin_index=164)
-#plotMaxDegrees(0,3,100,5000,"_us",areas["US"],origin_index=316)
-
-#heatmapsGowalla(164,[0.2,0.4,0.7,1],[0.1,0.4,0.7,1],"_mixed_pen_US_random",areas = areas,method = "random")
-#heatmapsGowalla(164,[1,0.7,0.5,0.3],[0.2,0.4,0.7,1],"_mixed_pen_Europe_random",areas = areas,method = "random")
-
-#316 for first big cluster, and 164 for second big cluster
-
+# node index 316 for a point in the US, 164 for point in Europe (can be optimized)
