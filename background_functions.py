@@ -107,8 +107,9 @@ def PPPGirg(n,d,tau,alpha,deg = None, seed = None):
 # dict[key] returns a list with 3 values, where the [0] is the infection index, [1] is the time it took to infect
 # and [2] is the index of the node which infected [key]. 
 # argument "vertex_set" is either "Z1", "Z2", or "PPP", this is for determining the origin_index node (1-d lattice, 2-d lattice, PPP respectively as underlying vertex sets), automatically set to "Z2" as this is what ive used most
-def infectionSpread(g,status,weights,L_rv,mu, vertex_set = "Z2", ratio = 1, origin_index = None, method = 1):
+def infectionSpread(g,status,weights,L_rv,mu, vertex_set = "Z2", ratio = 1, origin_index = None, method = 1, penalize = True, pos = []):
     start_time = time.time()
+
     if vertex_set not in ["Z1","Z2","PPP"]:
         raise TypeError("The vertex_set argument entered is not one of Z1,Z2 or PPP")
     
@@ -116,13 +117,18 @@ def infectionSpread(g,status,weights,L_rv,mu, vertex_set = "Z2", ratio = 1, orig
     cutoff = ratio*num_vertices
     trans_cost = g.new_edge_property("float")
 
+    penalty = 0 
+    if penalize:
+        penalty = (2/3)*gt.vertex_average(g,"total")[0] # Change this to change the penalty within the edge cost degree calculation
+
     for e in g.edges():
         match method:
             case 1:
                 trans_cost[e] = L_rv[e]*(weights[int(e.source())]*weights[int(e.target())])**mu
             case 2:
-                penalty = 16 # Change this to change the penalty within the edge cost degree calculation
                 trans_cost[e] = L_rv[e] * (max(1,e.source().out_degree()-penalty)*(max(1,e.target().out_degree()-penalty)))**mu
+            case 3:
+                trans_cost[e] = L_rv[e]*(sqrt((pos[e.source()][0] - pos[e.target()][0])**2 + (pos[e.source()][1] - pos[e.target()][1])**2))**mu
 
     if origin_index is None:   
         match vertex_set:
@@ -252,6 +258,7 @@ def draw(m,title,cmap = 'jet'):
     plt.imshow(m,cmap,interpolation ='spline16')
     plt.title(title)
 
+#Generates a heatmap based on median infection time around a gridpoint, used when the underlying vertex set is not on a grid
 def setLattice(n,g,pos,infs,noinfecs):
     start_time = time.time()
     lim = int(sqrt(n))

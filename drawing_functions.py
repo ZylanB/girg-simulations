@@ -94,7 +94,7 @@ def four_heatmaps(lim,tau_list,alpha_list,mu_list, vertex_set = "Z2", title_list
 
 # Generates four heatmaps on the exact same graph, just mu varying, (exp(1)'s also stay the same!)
 # saves each heatmap seperately and as a complete picture with all 4.
-def four_heatmaps_same_graph(lim,tau,alpha,mu_list,vertex_set = "Z2", title_list = [1,2,3,4], marker = "", ratio = 1, origin_index = None, deg = None, seed = None):
+def four_heatmaps_same_graph(lim,tau,alpha,mu_list,vertex_set = "Z2", title_list = [1,2,3,4], marker = "", ratio = 1, origin_index = None, method = 1, penalize = True, deg = None, seed = None):
 
     if len(mu_list) != 4 or len(title_list) != 4:
         raise ValueError("One of your parameter lists is not of length 4.")
@@ -105,26 +105,27 @@ def four_heatmaps_same_graph(lim,tau,alpha,mu_list,vertex_set = "Z2", title_list
     match vertex_set:
         case "Z2":
             g,pos,st,w,L_rv = bf.Lattice(lim,2,tau,alpha,deg,seed)
-            infs_1,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_1,vertex_set,origin_index)
-            infs_2,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_2,vertex_set,origin_index)
-            infs_3,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_3,vertex_set,origin_index)
-            infs_4,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_4,vertex_set,origin_index)
+            infs_1,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_1,vertex_set,ratio,origin_index,method,penalize,pos=pos)
+            infs_2,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_2,vertex_set,ratio,origin_index,method,penalize,pos=pos)
+            infs_3,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_3,vertex_set,ratio,origin_index,method,penalize,pos=pos)
+            infs_4,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_4,vertex_set,ratio,origin_index,method,penalize,pos=pos)
             heatmap_matrix_1 = bf.heatmapMatrix(infs_1,lim)
             heatmap_matrix_2 = bf.heatmapMatrix(infs_2,lim)
             heatmap_matrix_3 = bf.heatmapMatrix(infs_3,lim)
             heatmap_matrix_4 = bf.heatmapMatrix(infs_4,lim)
         case "PPP":
             g,pos,st,w,L_rv,distL = bf.PPPGirg(lim,2,tau,alpha,deg,seed)
-            infs_1,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_1,vertex_set,origin_index)
-            infs_2,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_2,vertex_set,origin_index)
-            infs_3,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_3,vertex_set,origin_index)
-            infs_4,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_4,vertex_set,origin_index)
+            infs_1,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_1,vertex_set,origin_index,ratio = ratio,method = method,pos=pos)
+            infs_2,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_2,vertex_set,origin_index,ratio = ratio,method = method,pos=pos)
+            infs_3,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_3,vertex_set,origin_index,ratio = ratio,method = method,pos=pos)
+            infs_4,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu_4,vertex_set,origin_index,ratio = ratio,method = method,pos=pos)
             heatmap_matrix_1 = bf.setLattice(lim,g,pos,infs_1,noInfecs,mu_1)
             heatmap_matrix_2 = bf.setLattice(lim,g,pos,infs_2,noInfecs,mu_2)
             heatmap_matrix_3 = bf.setLattice(lim,g,pos,infs_3,noInfecs,mu_3)
             heatmap_matrix_4 = bf.setLattice(lim,g,pos,infs_4,noInfecs,mu_4)
 
     fig = plt.figure(figsize=(14,14))
+    plt.axis('off')
     colors1 = plt.cm.jet(np.linspace(0.,1,255))
     colors2 = plt.cm.Reds(np.linspace(0,1,1))
     colors = np.vstack((colors2,colors1))
@@ -137,26 +138,30 @@ def four_heatmaps_same_graph(lim,tau,alpha,mu_list,vertex_set = "Z2", title_list
             cmap = mymap
 
     ax1 = fig.add_subplot(2,2,1)
-    bf.draw(heatmap_matrix_1,title_1,cmap = cmap)
+    bf.draw(heatmap_matrix_1," ",cmap = cmap)
+    plt.axis('off')
     extent1 = ax1.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig("four_heatmaps_same_graph_" + str(title_1),bbox_inches = extent1.expanded(1.3,1.4))
+    fig.savefig("four_heatmaps_same_graph_" + marker +  str(title_1),bbox_inches = extent1.expanded(1.3,1.4))
 
     ax2 = fig.add_subplot(2,2,2)
-    bf.draw(heatmap_matrix_2,title_2,cmap = cmap)
+    bf.draw(heatmap_matrix_2," ",cmap = cmap)
+    plt.axis('off')
     extent2 = ax2.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig("four_heatmaps_same_graph_" + str(title_2),bbox_inches = extent2.expanded(1.3,1.4))
+    fig.savefig("four_heatmaps_same_graph_" + marker + str(title_2),bbox_inches = extent2.expanded(1.3,1.4))
 
     ax3 = fig.add_subplot(2,2,3)
-    bf.draw(heatmap_matrix_3,title_3,cmap = cmap)
+    bf.draw(heatmap_matrix_3," ",cmap = cmap)
+    plt.axis('off')
     extent3 = ax3.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig("four_heatmaps_same_graph_" + str(title_3),bbox_inches = extent3.expanded(1.3,1.27))
+    fig.savefig("four_heatmaps_same_graph_" + marker + str(title_3),bbox_inches = extent3.expanded(1.3,1.27))
 
     ax4 = fig.add_subplot(2,2,4)
-    bf.draw(heatmap_matrix_4,title_4,cmap = cmap)
+    bf.draw(heatmap_matrix_4," ",cmap = cmap)
+    plt.axis('off')
     extent4 = ax4.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig("four_heatmaps_same_graph_" + str(title_4),bbox_inches = extent4.expanded(1.3,1.27))
+    fig.savefig("four_heatmaps_same_graph_" + marker +  str(title_4),bbox_inches = extent4.expanded(1.3,1.27))
 
-    fig.savefig('Four_heatmaps_same_graph_' + str(marker) + '.png')
+    fig.savefig('four_heatmaps_same_graph_' + str(marker) + '.png')
 
 
 def circleInfectionTime(size,d,tau,alpha,mu,r, eps = 0.5, vertex_set = "Z2", marker = "", savefig = False, deg = None, seed = None, ratio = 1, origin_index = None, method = 1):
@@ -214,7 +219,7 @@ def radiusTime(size,d,tau,alpha,mu,r_num, vertex_set = "Z2", marker = "", savefi
 # This draws 5 geodesics, proportional cost of the longest edge, proportional cost of the most expensive edge, proportional length of the longest edge, degree of the starting node of the longest edge, and the hopcount.
 # These geodesics are averaged over "sample_amount" (type: int, preferably divisible by 6 in the Z2 case for selection purposes but this is not a requirement) nodes on a single graph. 
 # For most of my pictures I used a mu ranging from 0 to 2.5 in 201 steps (mu_num gives the amount of steps). 
-# Note that this does tend to take a long time to run. as it has to run 201 simulations, on larger graphs this can quickly take up to anywhere between 10-25 hours.
+# Note that this does tend to take a long time to run. as it has to run 201 simulations, on larger graphs this can quickly take up to anywhere between 10-25 hours. (yes it is not optimized to where it can be)
 def drawGeodesics(size,d,tau,alpha,mu_min,mu_max,mu_num,sample_amount, vertex_set = "Z2", marker = "", deg = None, seed = None, ratio = 1, origin_index = None, method = 1):
 
     mu_list = np.linspace(mu_min,mu_max,mu_num)
