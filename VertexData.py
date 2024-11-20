@@ -53,7 +53,7 @@ def euclideanDistanceFunction(d: int) -> Callable[[Tuple[float, ...], Tuple[floa
     return functools.partial(euclideanDistance, d=d)
 
 
-def Lattice(dimension: int, size: int) -> VertexData:
+def lattice(dimension: int, size: int) -> VertexData:
     """Returns a VertexData for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
     # Curry the dimension into the distance
     return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(d=dimension, size=size))
@@ -81,7 +81,7 @@ def torusDistanceFunction(d: int, size: float) -> Callable[[Tuple[float, ...], T
     return functools.partial(euclideanDistance, d=d, size=size)
 
 
-def PoissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
+def poissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
     """Returns a VertexData for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
     if generator is None:
