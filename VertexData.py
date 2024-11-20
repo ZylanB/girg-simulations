@@ -1,4 +1,4 @@
-from math import pow, abs
+from math import pow
 import functools
 import itertools
 import numpy as np
