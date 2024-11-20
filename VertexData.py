@@ -19,7 +19,7 @@ class VertexData:
         self.id_to_position = None
         self.position_to_id = None
 
-    def setPointsFromIds(self, points: Dict[Any, List[Tuple[float, ...]]]):
+    def setPointsFromIds(self, points: Dict[Any, Tuple[float, ...]]):
         """Initialises points from a pre-existing dictionary mapping IDs to coordinates"""
         self.id_to_position = points
         self.position_to_id = {position: point_id for point_id, position in points.items()}
