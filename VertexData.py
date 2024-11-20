@@ -56,16 +56,17 @@ def euclideanDistanceFunction(d: int) -> Callable[[Tuple[float, ...], Tuple[floa
 def Lattice(dimension: int, size: int) -> VertexData:
     """Returns a VertexData for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
     # Curry the dimension into the distance
-    return_value = VertexData(dimension=dimension, distance_function=euclideanDistanceFunction(dimension))
+    return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(d=dimension, size=size))
 
-    one_axis_points = [float(i) for i in range(0, size + 1)]
+    # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
+    one_axis_points = [float(i) for i in range(0, size)]
     points = list(itertools.product(one_axis_points, repeat=dimension))
     return_value.setPoints(points)
 
     return return_value
 
 
-def torusDistance(x: Tuple[float], y: Tuple[float], size: int, d: int) -> float:
+def torusDistance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> float:
     """Returns the distance between x and y on [0,size]^d considered as a torus."""
     l1_distances = [0]*d
     for i in range(d):
@@ -75,12 +76,12 @@ def torusDistance(x: Tuple[float], y: Tuple[float], size: int, d: int) -> float:
     return pow(sum(x**d for x in l1_distances), 1/d)
 
 
-def torusDistanceFunction(d: int, size: int) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
+def torusDistanceFunction(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
     """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
     return functools.partial(euclideanDistance, d=d, size=size)
 
 
-def PoissonPointProcess(dimension: int, size: int, generator: Optional[np.random.Generator]) -> VertexData:
+def PoissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
     """Returns a VertexData for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
     if generator is None:
