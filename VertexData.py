@@ -112,12 +112,3 @@ def earthDistance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
     """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
     (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
     return haversine.haversine(x, y)
-
-    # r = 6371  # Radius of Earth
-    # phi = (radians(x[0]), radians(y[0]))
-    # Lambda = (radians(x[1]), radians(y[1]))
-    # d_phi = phi[1] - phi[0]
-    # d_lambda = Lambda[1] - Lambda[0]
-    #
-    # asin_numerator = 1 - cos(d_phi) + cos(phi[0]) * cos(phi[1]) * (1 - cos(d_lambda))
-    # return 2 * r * asin(sqrt(asin_numerator / 2.0))
