@@ -8,11 +8,11 @@ from typing import Callable, List, Dict, Tuple, Any, Optional
 class VertexData:
     def __init__(self, dimension: int, distance_function: Callable[[Tuple[float, ...], Tuple[float, ...]], float]):
         """Stores a vertex set for a GIRG and provides some spatial utility functions. Usage: Construct with
-        VertexData(dimension, distance_function), then set the actual vertices using either setPointsFromIds or
+        VertexData(dimension, distance), then set the actual vertices using either setPointsFromIds or
         setPoints."""
         self.dimension = dimension  # Dimension of the space (used for e.g. edge probabilities)
         # Distance function - should take two points in the space and return the distance between them
-        self.distance_function = distance_function
+        self.distance = distance_function
         # Points in the vertex set. Note we don't store these as NumPy arrays as iterating over these or reading
         # individual values is super-slow. We'll store a NumPy array separately for when it's useful and use the
         # position_to_id map to go from the raw positions stored in the NumPy array to the IDs stored here.
@@ -29,11 +29,19 @@ class VertexData:
         self.id_to_position = {i: points[i] for i in range(len(points))}
         self.position_to_id = {points[i]: i for i in range(len(points))}
 
+    @property
+    def points(self):
+        return self.id_to_position.values()
+
+    @property
+    def ids(self):
+        return self.position_to_id.values()
+
     def getIdsInAnnulus(self, center: Tuple[float, ...], inner_radius: float, outer_radius: float) -> List[int]:
         """Returns a list of IDs of points whose distance from center lies in [inner_radius, outer_radius]."""
         id_list = []
         for point_id, point in self.id_to_position.items():
-            distance = self.distance_function(center, point)
+            distance = self.distance(center, point)
             if (distance >= inner_radius) and (distance <= outer_radius):
                 id_list.append(point_id)
         return id_list
@@ -78,7 +86,7 @@ def torusDistance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> floa
 
 def torusDistanceFunction(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
     """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
-    return functools.partial(euclideanDistance, d=d, size=size)
+    return functools.partial(torusDistance, d=d, size=size)
 
 
 def poissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
