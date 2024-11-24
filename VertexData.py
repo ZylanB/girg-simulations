@@ -30,7 +30,7 @@ class VertexData:
         self.position_to_id = {points[i]: i for i in range(len(points))}
 
     @property
-    def points(self):
+    def positions(self):
         return self.id_to_position.values()
 
     @property
