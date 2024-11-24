@@ -1,3 +1,4 @@
+import math
 import unittest
 from VertexData import *
 
@@ -71,6 +72,7 @@ class TestVertexData(unittest.TestCase):
         points_found = self.test_instance.getIdsInBall(center=(1., 1.), radius=1.0)
         self.assertEqual(set(points_found), {0,1,2})
 
+
 class TestLattice(unittest.TestCase):
     def test_1d(self):
         test_instance = lattice(dimension=1, size=6)
@@ -104,6 +106,18 @@ class TestLattice(unittest.TestCase):
         point_ids = test_instance.getIdsInAnnulus((0.,3.), 1.1, 2.1)
         positions = {test_instance.id_to_position[point_id] for point_id in point_ids}
         self.assertEqual(positions, {(0., 1.), (1., 0), (1., 2.), (2., 3.), (3., 0.), (3., 2.)})
+
+
+class TestEarthDistance(unittest.TestCase):
+    def testSimple(self):
+        bristol = (51.4545, -2.5879)
+        delft = (52.0116, 4.3571)
+        self.assertEqual(earthDistance(bristol, delft), 482.07966758305776)
+
+        london = (51.6072, -0.1276)
+        new_york = (40.7128, -74.0060)
+        self.assertEqual(earthDistance(london, new_york), 5566.760358601733)
+
 
 if __name__ == '__main__':
     unittest.main()
