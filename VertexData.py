@@ -1,4 +1,4 @@
-from math import pow, cos, asin, sqrt, radians
+from math import pow
 import haversine
 import functools
 import itertools
@@ -62,19 +62,6 @@ def euclideanDistanceFunction(d: int) -> Callable[[Tuple[float, ...], Tuple[floa
     return functools.partial(euclideanDistance, d=d)
 
 
-def lattice(dimension: int, size: int) -> VertexData:
-    """Returns a VertexData for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
-    # Curry the dimension into the distance
-    return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(d=dimension, size=size))
-
-    # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
-    one_axis_points = [float(i) for i in range(0, size)]
-    points = list(itertools.product(one_axis_points, repeat=dimension))
-    return_value.setPoints(points)
-
-    return return_value
-
-
 def torusDistance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> float:
     """Returns the distance between x and y on [0,size]^d considered as a torus."""
     l1_distances = [0]*d
@@ -88,6 +75,25 @@ def torusDistance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> floa
 def torusDistanceFunction(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
     """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
     return functools.partial(torusDistance, d=d, size=size)
+
+
+def earthDistance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
+    """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
+    (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
+    return haversine.haversine(x, y)
+
+
+def lattice(dimension: int, size: int) -> VertexData:
+    """Returns a VertexData for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
+    # Curry the dimension into the distance
+    return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(d=dimension, size=size))
+
+    # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
+    one_axis_points = [float(i) for i in range(0, size)]
+    points = list(itertools.product(one_axis_points, repeat=dimension))
+    return_value.setPoints(points)
+
+    return return_value
 
 
 def poissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
@@ -106,9 +112,3 @@ def poissonPointProcess(dimension: int, size: float, generator: Optional[np.rand
     return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(dimension, size))
     return_value.setPoints(points)
     return return_value
-
-
-def earthDistance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
-    """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
-    (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
-    return haversine.haversine(x, y)
