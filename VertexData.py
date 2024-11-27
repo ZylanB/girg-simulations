@@ -106,7 +106,7 @@ def poissonPointProcess(dimension: int, size: float, generator: Optional[np.rand
     point_count = generator.poisson(size**dimension)
     points = []
     for i in range(point_count):
-        next_point_coordinates = tuple(generator.uniform(size=dimension))
+        next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
         points.append(next_point_coordinates)
 
     return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(dimension, size))
