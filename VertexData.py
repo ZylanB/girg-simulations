@@ -32,11 +32,13 @@ class VertexData:
 
     @property
     def positions(self):
-        return self.id_to_position.values()
+        """Returns the set of all positions in the vertex set."""
+        return set(self.id_to_position.values())
 
     @property
     def ids(self):
-        return self.position_to_id.values()
+        """Returns the set of all vertex IDs in the vertex set."""
+        return set(self.position_to_id.values())
 
     def getIdsInAnnulus(self, center: Tuple[float, ...], inner_radius: float, outer_radius: float) -> List[int]:
         """Returns a list of IDs of points whose distance from center lies in [inner_radius, outer_radius]."""
