@@ -1,5 +1,8 @@
+from TestDistribution import dkw_p_value
+from scipy.stats import poisson
 import unittest
 from VertexData import *
+from collections import defaultdict
 
 
 class TestVertexData(unittest.TestCase):
@@ -116,6 +119,46 @@ class TestEarthDistance(unittest.TestCase):
         london = (51.6072, -0.1276)
         new_york = (40.7128, -74.0060)
         self.assertEqual(earthDistance(london, new_york), 5566.760358601733)
+
+
+class TestPPP(unittest.TestCase):
+    def testDistribution(self):
+        """Runs a DKW-based test to check that the number of points in a uniformly-chosen 5x5 square within [0,
+        10]^2 roughly follows a Poisson distribution with mean 25, and that the number of points in two disjoint 3x3
+        squares (one from the lower-left quadrant and one from the upper-right quadrant) roughly follows a Poisson
+        distribution with mean 18. In each case the allowed error in total variation distance is .01."""
+
+        entropy = 207557186055428275376091733348063779829  # Generated from numpy via OS entropy
+        generator = np.random.default_rng(seed=entropy)
+
+        big_point_counts = defaultdict(lambda: 0)
+        small_point_counts = defaultdict(lambda: 0)
+
+        for i in range(100000):
+            instance = poissonPointProcess(dimension=2, size=10., generator=generator)
+
+            # Lower-left corners for each square
+            big_corner = generator.uniform(low=0., high=5., size=2)
+            small_left_corner = generator.uniform(low=0., high=2., size=2)
+            small_right_corner = generator.uniform(low=5., high=7., size=2)
+
+            def in_square(p, corner, side):
+                return corner[0] <= p[0] < corner[0] + side and corner[1] <= p[1] < corner[1] + side
+
+            big_points = len([p for p in instance.positions if in_square(p, big_corner, 5.)])
+            big_point_counts[big_points] += 1
+
+            small_left_points = len([p for p in instance.positions if in_square(p, small_left_corner, 3.)])
+            small_right_points = len([p for p in instance.positions if in_square(p, small_right_corner, 3.)])
+            small_point_counts[small_left_points + small_right_points] += 1
+
+        expected_big_pmf = lambda k: poisson.pmf(k=k, mu=25)
+        big_result = dkw_p_value(sample_data=big_point_counts, pmf=expected_big_pmf, tvd_bound=.01)
+        self.assertEqual(3.0276024398808153e-06, big_result)
+
+        expected_small_pmf = lambda k: poisson.pmf(k=k, mu=18)
+        small_result = dkw_p_value(sample_data=small_point_counts, pmf=expected_small_pmf, tvd_bound=.01)
+        self.assertEqual(1.2098219064806303e-06, small_result)
 
 
 if __name__ == '__main__':
