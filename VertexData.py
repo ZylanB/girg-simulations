@@ -98,7 +98,7 @@ def lattice(dimension: int, size: int) -> VertexData:
     return return_value
 
 
-def poissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator]) -> VertexData:
+def poissonPointProcess(dimension: int, size: float, generator: Optional[np.random.Generator] = None) -> VertexData:
     """Returns a VertexData for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
     if generator is None:
