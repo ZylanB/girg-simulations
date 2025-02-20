@@ -31,6 +31,11 @@ class VertexData:
         self.position_to_id = {points[i]: i for i in range(len(points))}
 
     @property
+    def size(self) -> int:
+        """Returns the total number of vertices in the vertex set."""
+        return len(self.id_to_position)
+
+    @property
     def positions(self) -> Set[Tuple[float, ...]]:
         """Returns the set of all positions in the vertex set."""
         return set(self.id_to_position.values())

@@ -15,8 +15,9 @@ class TestVertexData(unittest.TestCase):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
         self.test_instance.setPointsFromIds(point_dict)
 
-        self.assertEqual(set(self.test_instance.positions), {(1., 1.), (2., 2.), (3., 3.)})
-        self.assertEqual(set(self.test_instance.ids), {57, "Frog", 11.5})
+        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
+        self.assertEqual(self.test_instance.ids, {57, "Frog", 11.5})
+        self.assertEqual(self.test_instance.size, 3)
 
     def test_setpoints(self):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
