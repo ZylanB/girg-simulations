@@ -3,13 +3,13 @@ import haversine
 import functools
 import itertools
 import numpy as np
-from typing import Callable, List, Dict, Tuple, Any, Optional
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 
 class VertexData:
     def __init__(self, dimension: int, distance_function: Callable[[Tuple[float, ...], Tuple[float, ...]], float]):
-        """Stores a vertex set for a GIRG and provides some spatial utility functions. Usage: Construct with
-        VertexData(dimension, distance), then set the actual vertices using either setPointsFromIds or
+        """Stores a vertex set for a GIRG with spatial data and provides some spatial utility functions. Usage:
+        Construct with VertexData(dimension, distance), then set the actual vertices using either setPointsFromIds or
         setPoints."""
         self.dimension = dimension  # Dimension of the space (used for e.g. edge probabilities)
         # Distance function - should take two points in the space and return the distance between them
@@ -31,12 +31,12 @@ class VertexData:
         self.position_to_id = {points[i]: i for i in range(len(points))}
 
     @property
-    def positions(self):
+    def positions(self) -> Set[Tuple[float, ...]]:
         """Returns the set of all positions in the vertex set."""
         return set(self.id_to_position.values())
 
     @property
-    def ids(self):
+    def ids(self) -> Set[Any]:
         """Returns the set of all vertex IDs in the vertex set."""
         return set(self.position_to_id.values())
 
