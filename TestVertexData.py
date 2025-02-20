@@ -131,7 +131,7 @@ class TestPPP(unittest.TestCase):
         squares (one from the lower-left quadrant and one from the upper-right quadrant) roughly follows a Poisson
         distribution with mean 18. In each case the allowed error in total variation distance is .01."""
 
-        entropy = 207557186055428275376091733348063779829  # Generated from numpy via OS entropy
+        entropy = 207557186055428275376091733348063779829  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
 
         big_point_counts = defaultdict(lambda: 0)
