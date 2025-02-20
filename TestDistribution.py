@@ -36,6 +36,11 @@ def dkw_p_value(sample_data: Dict[int, int], pmf: Callable[[int], float], tvd_bo
     n = sum(sample_data.values())
     sample_distance_from_pmf = sample_tvd(sample_data=sample_data, pmf=pmf)
 
+    """If the sample itself is further than tvd_bound from the target distribution, then we're clearly not going to get 
+    anything of value so just return an upper bound of 1."""
+    if tvd_bound < sample_distance_from_pmf:
+        return 1.0
+
     """Write the sample data's true pmf as F', write its sample pmf as \hat{F'}, and write the given pmf be F. Then 
     by the triangle inequality, d_TV(\hat{F'}, F') >= d_TV(F, F') - d_TV(\hat{F}, F), so the following is a lower bound 
     on d_TV(\hat{F'}, F') under the null hypothesis."""
