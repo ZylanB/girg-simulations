@@ -8,8 +8,8 @@ from collections import defaultdict
 class TestVertexData(unittest.TestCase):
     @classmethod
     def setUp(cls):
-        distance_function = (lambda x, y: 0.0 if x == y else 1.0)  # Unit metric
-        cls.test_instance = VertexData(dimension=2, distance_function=distance_function)
+        metric = (lambda x, y: 0.0 if x == y else 1.0)  # Unit metric
+        cls.test_instance = VertexData(dimension=2, metric=metric)
 
     def test_properties(self):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
@@ -18,6 +18,8 @@ class TestVertexData(unittest.TestCase):
         self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
         self.assertEqual(self.test_instance.ids, {57, "Frog", 11.5})
         self.assertEqual(self.test_instance.size, 3)
+        self.assertEqual(0.0, self.test_instance.distance(57, 57))
+        self.assertEqual(1.0, self.test_instance.distance(57, "Frog"))
 
     def test_setpoints(self):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
@@ -83,9 +85,9 @@ class TestLattice(unittest.TestCase):
         point_set = {(0.,), (1.,), (2.,), (3.,), (4.,), (5.,)}
         self.assertEqual(set(test_instance.positions), point_set)
 
-        self.assertEqual(test_instance.distance((0.,), (1.,)), 1.)
-        self.assertEqual(test_instance.distance((0.,), (5.,)), 1.)
-        self.assertEqual(test_instance.distance((0.,), (4.,)), 2.)
+        self.assertEqual(test_instance.metric((0.,), (1.,)), 1.)
+        self.assertEqual(test_instance.metric((0.,), (5.,)), 1.)
+        self.assertEqual(test_instance.metric((0.,), (4.,)), 2.)
 
         point_ids = test_instance.getIdsInAnnulus((0., 0.), 1.5, 3.5)
         positions = {test_instance.id_to_position[point_id] for point_id in point_ids}
@@ -99,12 +101,12 @@ class TestLattice(unittest.TestCase):
                      (3., 0.), (3., 1.), (3., 2.), (3., 3.)}
         self.assertEqual(set(test_instance.positions), point_set)
 
-        self.assertEqual(test_instance.distance((0., 0.), (1., 0.)), 1.)
-        self.assertEqual(test_instance.distance((0., 0.), (0., 1.)), 1.)
-        self.assertEqual(test_instance.distance((0., 0.), (3., 0.)), 1.)
-        self.assertEqual(test_instance.distance((0., 0.), (0., 3.)), 1.)
-        self.assertEqual(test_instance.distance((0., 0.), (0., 2.)), 2.)
-        self.assertEqual(test_instance.distance((0., 0.), (3., 3.)), pow(2, 0.5))
+        self.assertEqual(test_instance.metric((0., 0.), (1., 0.)), 1.)
+        self.assertEqual(test_instance.metric((0., 0.), (0., 1.)), 1.)
+        self.assertEqual(test_instance.metric((0., 0.), (3., 0.)), 1.)
+        self.assertEqual(test_instance.metric((0., 0.), (0., 3.)), 1.)
+        self.assertEqual(test_instance.metric((0., 0.), (0., 2.)), 2.)
+        self.assertEqual(test_instance.metric((0., 0.), (3., 3.)), pow(2, 0.5))
 
         point_ids = test_instance.getIdsInAnnulus((0., 3.), 1.1, 2.1)
         positions = {test_instance.id_to_position[point_id] for point_id in point_ids}

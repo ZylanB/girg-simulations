@@ -7,18 +7,22 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 
 class VertexData:
-    def __init__(self, dimension: int, distance_function: Callable[[Tuple[float, ...], Tuple[float, ...]], float]):
+    def __init__(self, dimension: int, metric: Callable[[Tuple[float, ...], Tuple[float, ...]], float]):
         """Stores a vertex set for a GIRG with spatial data and provides some spatial utility functions. Usage:
         Construct with VertexData(dimension, distance), then set the actual vertices using either setPointsFromIds or
         setPoints."""
         self.dimension = dimension  # Dimension of the space (used for e.g. edge probabilities)
         # Distance function - should take two points in the space and return the distance between them
-        self.distance = distance_function
+        self.metric = metric
         # Points in the vertex set. Note we don't store these as NumPy arrays as iterating over these or reading
         # individual values is super-slow. We'll store a NumPy array separately for when it's useful and use the
         # position_to_id map to go from the raw positions stored in the NumPy array to the IDs stored here.
         self.id_to_position = None
         self.position_to_id = None
+
+    def distance(self, id_x, id_y):
+        """Returns the distance between the two points with the given IDs."""
+        return self.metric(self.id_to_position[id_x], self.id_to_position[id_y])
 
     def setPointsFromIds(self, points: Dict[Any, Tuple[float, ...]]):
         """Initialises points from a pre-existing dictionary mapping IDs to coordinates"""
@@ -49,7 +53,7 @@ class VertexData:
         """Returns a list of IDs of points whose distance from center lies in [inner_radius, outer_radius]."""
         id_list = []
         for point_id, point in self.id_to_position.items():
-            distance = self.distance(center, point)
+            distance = self.metric(center, point)
             if (distance >= inner_radius) and (distance <= outer_radius):
                 id_list.append(point_id)
         return id_list
@@ -93,7 +97,7 @@ def earthDistance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
 def lattice(dimension: int, size: int) -> VertexData:
     """Returns a VertexData for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
     # Curry the dimension into the distance
-    return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(d=dimension, size=size))
+    return_value = VertexData(dimension=dimension, metric=torusDistanceFunction(d=dimension, size=size))
 
     # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
     one_axis_points = [float(i) for i in range(0, size)]
@@ -116,6 +120,6 @@ def poissonPointProcess(dimension: int, size: float, generator: Optional[np.rand
         next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
         points.append(next_point_coordinates)
 
-    return_value = VertexData(dimension=dimension, distance_function=torusDistanceFunction(dimension, size))
+    return_value = VertexData(dimension=dimension, metric=torusDistanceFunction(dimension, size))
     return_value.setPoints(points)
     return return_value
