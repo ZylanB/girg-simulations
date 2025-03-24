@@ -1,22 +1,22 @@
 from TestDistribution import dkw_p_value
 from scipy.stats import poisson
 import unittest
-from VertexData import *
+from VertexSet import *
 from collections import defaultdict
 
 
-class TestVertexData(unittest.TestCase):
+class TestVertexSet(unittest.TestCase):
     @classmethod
     def setUp(cls):
         metric = (lambda x, y: 0.0 if x == y else 1.0)  # Unit metric
-        cls.test_instance = VertexData(dimension=2, metric=metric)
+        cls.test_instance = VertexSet(dimension=2, metric=metric)
 
     def test_properties(self):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
-        self.test_instance.setPointsFromIds(point_dict)
+        self.test_instance.setPointsFromNames(point_dict)
 
         self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
-        self.assertEqual(self.test_instance.ids, {57, "Frog", 11.5})
+        self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
         self.assertEqual(self.test_instance.size, 3)
         self.assertEqual(0.0, self.test_instance.distance(57, 57))
         self.assertEqual(1.0, self.test_instance.distance(57, "Frog"))
@@ -25,24 +25,49 @@ class TestVertexData(unittest.TestCase):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
         self.test_instance.setPoints(point_list)
 
-        self.assertEqual(list(self.test_instance.id_to_position.values()), point_list)
-        self.assertEqual(list(self.test_instance.position_to_id.keys()), point_list)
+        self.assertEqual(self.test_instance.names, {0, 1, 2})
+        self.assertEqual(self.test_instance.ids, {0, 1, 2})
+        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
 
-        for point_id, point_position in self.test_instance.id_to_position.items():
-            self.assertEqual(self.test_instance.position_to_id[point_position], point_id)
+        for data in self.test_instance.vertex_data:
+            self.assertEqual(data.name, data.id_)
 
     def test_setpointsfromids(self):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
-        self.test_instance.setPointsFromIds(point_dict)
+        self.test_instance.setPointsFromNames(point_dict)
 
-        self.assertEqual(self.test_instance.id_to_position, point_dict)
+        self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
+        self.assertEqual(self.test_instance.ids, {0, 1, 2})
+        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
 
-        for point_id, point_position in point_dict.items():
-            self.assertEqual(self.test_instance.position_to_id[point_position], point_id)
+        id_57 = self.test_instance.name_to_id(57)
+        id_frog = self.test_instance.name_to_id("Frog")
+        id_float = self.test_instance.name_to_id(11.5)
+
+        self.assertEqual(self.test_instance.id_to_position(id_57), (1.,1.))
+        self.assertEqual(self.test_instance.id_to_name(id_57), 57)
+        self.assertEqual(self.test_instance.position_to_id((1., 1.)), id_57)
+        self.assertEqual(self.test_instance.position_to_name((1., 1.)), 57)
+        self.assertEqual(self.test_instance.name_to_id(57), id_57)
+        self.assertEqual(self.test_instance.name_to_position(57), (1., 1.))
+
+        self.assertEqual(self.test_instance.id_to_position(id_frog), (2., 2.))
+        self.assertEqual(self.test_instance.id_to_name(id_frog), "Frog")
+        self.assertEqual(self.test_instance.position_to_id((2., 2.)), id_frog)
+        self.assertEqual(self.test_instance.position_to_name((2., 2.)), "Frog")
+        self.assertEqual(self.test_instance.name_to_id("Frog"), id_frog)
+        self.assertEqual(self.test_instance.name_to_position("Frog"), (2., 2.))
+
+        self.assertEqual(self.test_instance.id_to_position(id_float), (3., 3.))
+        self.assertEqual(self.test_instance.id_to_name(id_float), 11.5)
+        self.assertEqual(self.test_instance.position_to_id((3., 3.)), id_float)
+        self.assertEqual(self.test_instance.position_to_name((3., 3.)), 11.5)
+        self.assertEqual(self.test_instance.name_to_id(11.5), id_float)
+        self.assertEqual(self.test_instance.name_to_position(11.5), (3., 3.))
 
     def test_getidsinannulus(self):
         point_dict = {0: (1., 1.), 1: (2., 2.), 2: (3., 3.)}
-        self.test_instance.setPointsFromIds(point_dict)
+        self.test_instance.setPointsFromNames(point_dict)
 
         points_found = self.test_instance.getIdsInAnnulus(center=(1., 1.), inner_radius=0.5, outer_radius=0.9)
         self.assertEqual(set(points_found), set())
@@ -63,7 +88,7 @@ class TestVertexData(unittest.TestCase):
 
     def test_getidsinball(self):
         point_dict = {0: (1., 1.), 1: (2., 2.), 2: (3., 3.)}
-        self.test_instance.setPointsFromIds(point_dict)
+        self.test_instance.setPointsFromNames(point_dict)
 
         points_found = self.test_instance.getIdsInBall(center=(1., 1.), radius=0.5)
         self.assertEqual(set(points_found), {0})
@@ -90,7 +115,7 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(test_instance.metric((0.,), (4.,)), 2.)
 
         point_ids = test_instance.getIdsInAnnulus((0., 0.), 1.5, 3.5)
-        positions = {test_instance.id_to_position[point_id] for point_id in point_ids}
+        positions = {test_instance.name_to_position(point_id) for point_id in point_ids}
         self.assertEqual(positions, {(2.,), (3.,), (4.,)})
 
     def test_2d(self):
@@ -109,7 +134,7 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(test_instance.metric((0., 0.), (3., 3.)), pow(2, 0.5))
 
         point_ids = test_instance.getIdsInAnnulus((0., 3.), 1.1, 2.1)
-        positions = {test_instance.id_to_position[point_id] for point_id in point_ids}
+        positions = {test_instance.name_to_position(point_id) for point_id in point_ids}
         self.assertEqual(positions, {(0., 1.), (1., 0), (1., 2.), (2., 3.), (3., 0.), (3., 2.)})
 
 

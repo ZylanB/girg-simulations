@@ -1,15 +1,18 @@
-from VertexData import VertexData
+import graph_tool
+
+from VertexSet import VertexSet
 from typing import Any, Callable, Dict, Optional
 import girg_sampling.girgs as gs
+import graph_tool as gt
 import numpy as np
 
 
-class WeightedVertexData:
-    def __init__(self, vertices: VertexData, weight_generator: Callable[[VertexData], Dict[Any, float]], mu: float,
+class WeightedVertexSet:
+    def __init__(self, vertices: VertexSet, weight_generator: Callable[[VertexSet], Dict[Any, float]], mu: float,
                  zeta: float):
         """Stores a vertex set for a GIRG with both spatial and weight data. Vertices should be the underlying vertex
         set. Weight_generator should be a function that (probably randomly) resamples weights for the given
-        VertexData, returning a dictionary from vertex IDs to weights. Mu should be the weight penalty,
+        VertexSet, returning a dictionary from vertex IDs to weights. Mu should be the weight penalty,
         and zeta should be the spatial penalty."""
         self.vertices = vertices
         self.weight_generator = weight_generator
@@ -17,6 +20,10 @@ class WeightedVertexData:
         self.mu = mu
         self.zeta = zeta
         self.resample_weights()
+
+    def __getattr__(self, item):
+        """Delegation, allows use of members and methods from VertexSet without formal inheritance."""
+        return getattr(self.vertices, item)
 
     def weight(self, id_: Any) -> float:
         """Returns the weight of the vertex with the given id."""
@@ -34,8 +41,8 @@ class WeightedVertexData:
 
 
 def power_law_generator(tau: float, ell: Callable[[float], float] = id,
-                        generator: Optional[np.random.Generator] = None) -> Callable[[VertexData], Dict[Any, float]]:
-    """Returns a weight sampling function for WeightedVertexData which samples weights W i.i.d. from a power law, taking
+                        generator: Optional[np.random.Generator] = None) -> Callable[[VertexSet], Dict[Any, float]]:
+    """Returns a weight sampling function for WeightedVertexSet which samples weights W i.i.d. from a power law, taking
     Pr(W >= x) = 1 / x^{\tau - 1} and using the specified RNG, then applies the given scaling map to each weight."""
     if tau <= 2:
         raise ValueError("tau must be greater than 2 for the expected degrees to be finite.")
@@ -45,9 +52,9 @@ def power_law_generator(tau: float, ell: Callable[[float], float] = id,
     return lambda vertices: _power_law_sample(vertices=vertices, tau=tau, scaling=ell, generator=generator)
 
 
-def _power_law_sample(vertices: VertexData, tau: float, scaling: Callable[[float], float],
+def _power_law_sample(vertices: VertexSet, tau: float, scaling: Callable[[float], float],
                       generator: np.random.Generator) -> Dict[Any, float]:
-    """Samples weights W for the given VertexData i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
+    """Samples weights W for the given VertexSet i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
     and using the specified RNG, then applies the given scaling map to each weight."""
 
     # The upper bound isn't included in the range, so this samples a 31-bit integer to pass to Cython.
@@ -59,17 +66,17 @@ def _power_law_sample(vertices: VertexData, tau: float, scaling: Callable[[float
 
     # We map an arbitrary weight to each vertex ID since they're all i.i.d. anyway.
     weight_array = np.asarray(weights)
-    return dict(zip(vertices.ids, weight_array))
+    return dict(zip(vertices.names, weight_array))
 
 
-def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexData], Dict[Any, float]]:
-    """Returns a weight 'sampling function' for WeightedVertexData which just returns the given dictionary of
+def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexSet], Dict[Any, float]]:
+    """Returns a weight 'sampling function' for WeightedVertexSet which just returns the given dictionary of
     weights."""
     return lambda vertices: weights
 
 
-def from_degrees_generator(degrees: Dict[Any, int]) -> Callable[[VertexData], Dict[Any, float]]:
-    """Returns a weight sampling function for WeightedVertexData which 'samples' weights by estimating them based on
+def from_degrees_generator(degrees: Dict[Any, int]) -> Callable[[VertexSet], Dict[Any, float]]:
+    """Returns a weight sampling function for WeightedVertexSet which 'samples' weights by estimating them based on
     a supplied dictionary mapping vertex IDs to vertex degrees in the base graph. Used for the Gowalla dataset.
 
     IMPORTANT: We really don't understand why this seems to work. Do not submit the paper before we do. A more

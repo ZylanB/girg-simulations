@@ -1,7 +1,7 @@
 import unittest
 from TestDistribution import dkw_p_value
-from WeightedVertexData import *
-from VertexData import VertexData, euclideanDistanceFunction
+from WeightedVertexSet import *
+from VertexSet import VertexSet, euclideanDistanceFunction
 from collections import defaultdict
 from math import floor
 
@@ -11,9 +11,9 @@ class BasicTests(unittest.TestCase):
         self.weights = {1: 1., 2: 2.5, "abc": 3.}
         self.generator = fixed_weights_generator(self.weights)
 
-        self.vertices = VertexData(dimension=2, metric=euclideanDistanceFunction(d=2))
+        self.vertices = VertexSet(dimension=2, metric=euclideanDistanceFunction(d=2))
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
-        self.vertices.setPointsFromIds(points)
+        self.vertices.setPointsFromNames(points)
 
     def testFromDegrees(self):
         output = self.generator(self.vertices)
@@ -24,7 +24,7 @@ class BasicTests(unittest.TestCase):
     def testWeightedVertexData(self):
         mu = 2.
         zeta = 3.
-        data = WeightedVertexData(self.vertices, self.generator, mu=mu, zeta=zeta)
+        data = WeightedVertexSet(self.vertices, self.generator, mu=mu, zeta=zeta)
 
         self.assertEqual(self.weights[1], data.weight(1))
         self.assertEqual(self.weights[2], data.weight(2))
@@ -44,13 +44,13 @@ class BasicTests(unittest.TestCase):
         entropy = 331375102187953107209086426124205679010
         generator = np.random.default_rng(seed=entropy)
 
-        def weight_generator(vertices: VertexData) -> Dict[Any, float]:
-            return {id_: generator.random() for id_ in vertices.ids}
+        def weight_generator(vertices: VertexSet) -> Dict[Any, float]:
+            return {id_: generator.random() for id_ in vertices.names}
 
-        data = WeightedVertexData(self.vertices, weight_generator, mu=0., zeta=0.)
-        first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
+        data = WeightedVertexSet(self.vertices, weight_generator, mu=0., zeta=0.)
+        first_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
         data.resample_weights()
-        second_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
+        second_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
 
         self.assertEqual(first_sample.keys(), second_sample.keys())
         for id_ in first_sample.keys():
@@ -62,9 +62,9 @@ class TestFromDegrees(unittest.TestCase):
         degrees = {1: 40, 2: 20, "abc": 60, "def": 0}  # Average degree 30, penalty should be 20.
         generator = from_degrees_generator(degrees)
 
-        vertices = VertexData(dimension=2, metric=euclideanDistanceFunction(d=2))
+        vertices = VertexSet(dimension=2, metric=euclideanDistanceFunction(d=2))
         points = {1: (0, 0), 2: (1, 1), "abc": (2, 2), "def": (3, 3)}
-        vertices.setPointsFromIds(points)
+        vertices.setPointsFromNames(points)
 
         output = generator(vertices)
         self.assertEqual(20., output[1])
@@ -86,12 +86,12 @@ class TestPowerLaw(unittest.TestCase):
         weight_generator = power_law_generator(tau=tau, ell=scaling, generator=generator)
 
         n = 100000
-        vertices = VertexData(dimension=1, metric=euclideanDistanceFunction(d=1))
+        vertices = VertexSet(dimension=1, metric=euclideanDistanceFunction(d=1))
         vertices.setPoints([(i,) for i in range(n)])
-        test_instance = WeightedVertexData(vertices=vertices, weight_generator=weight_generator, mu=0.0, zeta=0.0)
+        test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator, mu=0.0, zeta=0.0)
 
         weight_counts = defaultdict(lambda: 0)
-        for i in vertices.ids:
+        for i in vertices.names:
             weight_counts[floor(test_instance.weight(i))] += 1
 
         r"""Pr(floor(2*W) = i) = Pr(W <= (i+1)/2) - Pr(W <= i/2) = (2/i)^{\tau-1} - (2/(i+1))^{\tau-1}."""

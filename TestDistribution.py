@@ -1,8 +1,7 @@
 from scipy.stats import poisson
 import unittest
-from VertexData import *
-from math import exp, sqrt
-from typing import Any, Callable, Dict
+from math import exp
+from typing import Callable, Dict
 
 
 def sample_tvd(sample_data: Dict[int, int], pmf: Callable[[int], float]):
