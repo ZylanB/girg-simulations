@@ -53,7 +53,7 @@ def dkw_p_value(sample_data: Dict[int, int], pmf: Callable[[int], float], tvd_bo
 
 
 class TestDKW(unittest.TestCase):
-    def testCoin(self):
+    def test_coin(self):
         def coin_pmf(k):
             if k in [0, 1]:
                 return 0.5
@@ -68,7 +68,7 @@ class TestDKW(unittest.TestCase):
         # LHS here is roughly .002222.
         self.assertEqual(2. * exp(-200. / 16.), dkw_p_value(sample_data=sample_data, pmf=coin_pmf, tvd_bound=0.25))
 
-    def testDie(self):
+    def test_die(self):
         def die_pmf(k):
             if 1 <= k <= 6:
                 return 1./6.
@@ -86,7 +86,7 @@ class TestDKW(unittest.TestCase):
                                dkw_p_value(sample_data=sample_data, pmf=die_pmf, tvd_bound=.2),
                                delta=0.0000000000000001)
 
-    def testPoisson(self):
+    def test_poisson(self):
         pmf = lambda k: poisson.pmf(k=k, mu=1)
         sample_data = {0: 1}
         self.assertEqual(1.-exp(-1.), sample_tvd(sample_data=sample_data, pmf=pmf))

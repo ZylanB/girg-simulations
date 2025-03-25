@@ -13,7 +13,7 @@ class TestVertexSet(unittest.TestCase):
 
     def test_properties(self):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
-        self.test_instance.setPointsFromNames(point_dict)
+        self.test_instance.set_points_from_names(point_dict)
 
         self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
         self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
@@ -26,7 +26,7 @@ class TestVertexSet(unittest.TestCase):
 
     def test_setpoints(self):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
-        self.test_instance.setPoints(point_list)
+        self.test_instance.set_points(point_list)
 
         self.assertEqual(self.test_instance.names, {0, 1, 2})
         self.assertEqual(self.test_instance.ids, {0, 1, 2})
@@ -37,7 +37,7 @@ class TestVertexSet(unittest.TestCase):
 
     def test_setpointsfromids(self):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
-        self.test_instance.setPointsFromNames(point_dict)
+        self.test_instance.set_points_from_names(point_dict)
 
         self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
         self.assertEqual(self.test_instance.ids, {0, 1, 2})
@@ -70,40 +70,40 @@ class TestVertexSet(unittest.TestCase):
 
     def test_getidsinannulus(self):
         point_dict = {0: (1., 1.), 1: (2., 2.), 2: (3., 3.)}
-        self.test_instance.setPointsFromNames(point_dict)
+        self.test_instance.set_points_from_names(point_dict)
 
-        points_found = self.test_instance.getIdsInAnnulus(center=(1., 1.), inner_radius=0.5, outer_radius=0.9)
+        points_found = self.test_instance.get_ids_in_annulus(center=(1., 1.), inner_radius=0.5, outer_radius=0.9)
         self.assertEqual(set(points_found), set())
 
-        points_found = self.test_instance.getIdsInAnnulus(center=(1., 1.), inner_radius=0.9, outer_radius=1.1)
+        points_found = self.test_instance.get_ids_in_annulus(center=(1., 1.), inner_radius=0.9, outer_radius=1.1)
         self.assertEqual(set(points_found), {1, 2})
 
-        points_found = self.test_instance.getIdsInAnnulus(center=(1., 1.), inner_radius=1.1, outer_radius=2.0)
+        points_found = self.test_instance.get_ids_in_annulus(center=(1., 1.), inner_radius=1.1, outer_radius=2.0)
         self.assertEqual(set(points_found), set())
 
         # Annulus should be closed at inside
-        points_found = self.test_instance.getIdsInAnnulus(center=(1., 1.), inner_radius=0.0, outer_radius=0.9)
+        points_found = self.test_instance.get_ids_in_annulus(center=(1., 1.), inner_radius=0.0, outer_radius=0.9)
         self.assertEqual(set(points_found), {0})
 
         # Annulus should be closed at outside
-        points_found = self.test_instance.getIdsInAnnulus(center=(0., 0.), inner_radius=0.5, outer_radius=1.0)
+        points_found = self.test_instance.get_ids_in_annulus(center=(0., 0.), inner_radius=0.5, outer_radius=1.0)
         self.assertEqual(set(points_found), {0, 1, 2})
 
     def test_getidsinball(self):
         point_dict = {0: (1., 1.), 1: (2., 2.), 2: (3., 3.)}
-        self.test_instance.setPointsFromNames(point_dict)
+        self.test_instance.set_points_from_names(point_dict)
 
-        points_found = self.test_instance.getIdsInBall(center=(1., 1.), radius=0.5)
+        points_found = self.test_instance.get_ids_in_ball(center=(1., 1.), radius=0.5)
         self.assertEqual(set(points_found), {0})
 
-        points_found = self.test_instance.getIdsInBall(center=(1., 1.), radius=1.5)
+        points_found = self.test_instance.get_ids_in_ball(center=(1., 1.), radius=1.5)
         self.assertEqual(set(points_found), {0, 1, 2})
 
-        points_found = self.test_instance.getIdsInBall(center=(0., 0.), radius=1.5)
+        points_found = self.test_instance.get_ids_in_ball(center=(0., 0.), radius=1.5)
         self.assertEqual(set(points_found), {0, 1, 2})
 
         # Ball should be closed
-        points_found = self.test_instance.getIdsInBall(center=(1., 1.), radius=1.0)
+        points_found = self.test_instance.get_ids_in_ball(center=(1., 1.), radius=1.0)
         self.assertEqual(set(points_found), {0, 1, 2})
 
 
@@ -117,7 +117,7 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(test_instance.metric((0.,), (5.,)), 1.)
         self.assertEqual(test_instance.metric((0.,), (4.,)), 2.)
 
-        point_ids = test_instance.getIdsInAnnulus((0., 0.), 1.5, 3.5)
+        point_ids = test_instance.get_ids_in_annulus((0., 0.), 1.5, 3.5)
         positions = {test_instance.name_to_position(point_id) for point_id in point_ids}
         self.assertEqual(positions, {(2.,), (3.,), (4.,)})
 
@@ -136,24 +136,24 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(test_instance.metric((0., 0.), (0., 2.)), 2.)
         self.assertEqual(test_instance.metric((0., 0.), (3., 3.)), pow(2, 0.5))
 
-        point_ids = test_instance.getIdsInAnnulus((0., 3.), 1.1, 2.1)
+        point_ids = test_instance.get_ids_in_annulus((0., 3.), 1.1, 2.1)
         positions = {test_instance.name_to_position(point_id) for point_id in point_ids}
         self.assertEqual(positions, {(0., 1.), (1., 0), (1., 2.), (2., 3.), (3., 0.), (3., 2.)})
 
 
 class TestEarthDistance(unittest.TestCase):
-    def testSimple(self):
+    def test_simple(self):
         bristol = (51.4545, -2.5879)
         delft = (52.0116, 4.3571)
-        self.assertEqual(earthDistance(bristol, delft), 482.07966758305776)
+        self.assertEqual(earth_distance(bristol, delft), 482.07966758305776)
 
         london = (51.6072, -0.1276)
         new_york = (40.7128, -74.0060)
-        self.assertEqual(earthDistance(london, new_york), 5566.760358601733)
+        self.assertEqual(earth_distance(london, new_york), 5566.760358601733)
 
 
 class TestPPP(unittest.TestCase):
-    def testDistribution(self):
+    def test_distribution(self):
         """Runs a DKW-based test to check that the number of points in a uniformly-chosen 5x5 square within [0,
         10]^2 roughly follows a Poisson distribution with mean 25, and that the number of points in two disjoint 3x3
         squares (one from the lower-left quadrant and one from the upper-right quadrant) roughly follows a Poisson
@@ -166,7 +166,7 @@ class TestPPP(unittest.TestCase):
         small_point_counts = defaultdict(lambda: 0)
 
         for i in range(100000):
-            instance = poissonPointProcess(dimension=2, size=10., generator=generator)
+            instance = poisson_point_process(dimension=2, size=10., generator=generator)
 
             # Lower-left corners for each square
             big_corner = generator.uniform(low=0., high=5., size=2)

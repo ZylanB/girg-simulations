@@ -1,7 +1,7 @@
 import unittest
 from TestDistribution import dkw_p_value
 from WeightedVertexSet import *
-from VertexSet import VertexSet, euclideanDistanceFunction
+from VertexSet import VertexSet, euclidean_distance_function
 from collections import defaultdict
 from math import floor
 
@@ -11,9 +11,9 @@ class BasicTests(unittest.TestCase):
         self.weights = {1: 1., 2: 2.5, "abc": 3.}
         self.generator = fixed_weights_generator(self.weights)
 
-        self.vertices = VertexSet(dimension=2, metric=euclideanDistanceFunction(d=2))
+        self.vertices = VertexSet(dimension=2, metric=euclidean_distance_function(d=2))
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
-        self.vertices.setPointsFromNames(points)
+        self.vertices.set_points_from_names(points)
 
         self.id_1 = self.vertices.name_to_id(1)
         self.id_2 = self.vertices.name_to_id(2)
@@ -67,9 +67,9 @@ class TestFromDegrees(unittest.TestCase):
         degrees = {1: 40, 2: 20, "abc": 60, "def": 0}  # Average degree 30, penalty should be 20.
         generator = from_degrees_generator(degrees)
 
-        vertices = VertexSet(dimension=2, metric=euclideanDistanceFunction(d=2))
+        vertices = VertexSet(dimension=2, metric=euclidean_distance_function(d=2))
         points = {1: (0, 0), 2: (1, 1), "abc": (2, 2), "def": (3, 3)}
-        vertices.setPointsFromNames(points)
+        vertices.set_points_from_names(points)
         output = generator(vertices)
 
         id_1 = vertices.name_to_id(1)
@@ -95,8 +95,8 @@ class TestPowerLaw(unittest.TestCase):
         weight_generator = power_law_generator(tau=tau, ell=scaling, generator=generator)
 
         n = 100000
-        vertices = VertexSet(dimension=1, metric=euclideanDistanceFunction(d=1))
-        vertices.setPoints([(i,) for i in range(n)])
+        vertices = VertexSet(dimension=1, metric=euclidean_distance_function(d=1))
+        vertices.set_points([(i,) for i in range(n)])
         test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator, mu=0.0, zeta=0.0)
 
         weight_counts = defaultdict(lambda: 0)
