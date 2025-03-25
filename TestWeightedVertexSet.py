@@ -19,14 +19,14 @@ class BasicTests(unittest.TestCase):
         self.id_2 = self.vertices.name_to_id(2)
         self.id_abc = self.vertices.name_to_id("abc")
 
-    def testFixedWeights(self):
+    def test_fixed_weights(self):
         output = self.generator(self.vertices)
 
         self.assertEqual(self.weights[1], output[self.id_1])
         self.assertEqual(self.weights[2], output[self.id_2])
         self.assertEqual(self.weights["abc"], output[self.id_abc])
 
-    def testWeightedVertexData(self):
+    def test_weighted_vertex_data(self):
         mu = 2.
         zeta = 3.
         data = WeightedVertexSet(self.vertices, self.generator, mu=mu, zeta=zeta)
@@ -44,7 +44,7 @@ class BasicTests(unittest.TestCase):
         self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(self.id_2, self.id_abc))
         self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(self.id_1, self.id_abc), delta=1e-13)
 
-    def testResample(self):
+    def test_resample(self):
         """Checks that resample_weights is actually resampling every vertex weight."""
         entropy = 331375102187953107209086426124205679010
         generator = np.random.default_rng(seed=entropy)
@@ -63,7 +63,7 @@ class BasicTests(unittest.TestCase):
 
 
 class TestFromDegrees(unittest.TestCase):
-    def testFromDegrees(self):
+    def test_from_degrees(self):
         degrees = {1: 40, 2: 20, "abc": 60, "def": 0}  # Average degree 30, penalty should be 20.
         generator = from_degrees_generator(degrees)
 
@@ -83,7 +83,7 @@ class TestFromDegrees(unittest.TestCase):
 
 
 class TestPowerLaw(unittest.TestCase):
-    def testPowerLaw(self):
+    def test_power_law(self):
         """Runs a DKW-based test to check that the weight distribution in a 100k-vertex set with tau=2.5 and
         scaling(w) = 2 is roughly what it should be, dividing into bins by taking the floor of each weight. The allowed
         error in total variation distance is .01."""
