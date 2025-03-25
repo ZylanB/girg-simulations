@@ -61,7 +61,7 @@ class VertexSet:
 
     def distance(self, id_x, id_y):
         """Returns the distance between the two points with the given IDs."""
-        return self.metric(self.name_to_position(id_x), self.name_to_position(id_y))
+        return self.metric(self.id_to_position(id_x), self.id_to_position(id_y))
 
     def setPointsFromNames(self, points: Dict[Any, Tuple[float, ...]]):
         """Initialises points from a pre-existing dictionary mapping names to coordinates"""

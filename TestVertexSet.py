@@ -18,8 +18,11 @@ class TestVertexSet(unittest.TestCase):
         self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
         self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
         self.assertEqual(self.test_instance.size, 3)
-        self.assertEqual(0.0, self.test_instance.distance(57, 57))
-        self.assertEqual(1.0, self.test_instance.distance(57, "Frog"))
+
+        id_57 = self.test_instance.name_to_id(57)
+        id_frog = self.test_instance.name_to_id("Frog")
+        self.assertEqual(0.0, self.test_instance.distance(id_57, id_57))
+        self.assertEqual(1.0, self.test_instance.distance(id_57, id_frog))
 
     def test_setpoints(self):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
@@ -44,7 +47,7 @@ class TestVertexSet(unittest.TestCase):
         id_frog = self.test_instance.name_to_id("Frog")
         id_float = self.test_instance.name_to_id(11.5)
 
-        self.assertEqual(self.test_instance.id_to_position(id_57), (1.,1.))
+        self.assertEqual(self.test_instance.id_to_position(id_57), (1., 1.))
         self.assertEqual(self.test_instance.id_to_name(id_57), 57)
         self.assertEqual(self.test_instance.position_to_id((1., 1.)), id_57)
         self.assertEqual(self.test_instance.position_to_name((1., 1.)), 57)
