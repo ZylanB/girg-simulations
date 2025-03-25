@@ -1,14 +1,11 @@
-import graph_tool
-
 from VertexSet import VertexSet
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 import girg_sampling.girgs as gs
-import graph_tool as gt
 import numpy as np
 
 
 class WeightedVertexSet:
-    def __init__(self, vertices: VertexSet, weight_generator: Callable[[VertexSet], Dict[Any, float]], mu: float,
+    def __init__(self, vertices: VertexSet, weight_generator: Callable[[VertexSet], List[float]], mu: float,
                  zeta: float):
         """Stores a vertex set for a GIRG with both spatial and weight data. Vertices should be the underlying vertex
         set. Weight_generator should be a function that (probably randomly) resamples weights for the given
@@ -25,7 +22,7 @@ class WeightedVertexSet:
         """Delegation, allows use of members and methods from VertexSet without formal inheritance."""
         return getattr(self.vertices, item)
 
-    def weight(self, id_: Any) -> float:
+    def weight(self, id_: int) -> float:
         """Returns the weight of the vertex with the given id."""
         return self.weights[id_]
 
@@ -33,7 +30,7 @@ class WeightedVertexSet:
         """Resamples the vertex weights from the given generator function."""
         self.weights = self.weight_generator(self.vertices)
 
-    def penalty(self, x_id, y_id) -> float:
+    def penalty(self, x_id: int, y_id: int) -> float:
         """Returns the total penalty for a possible edge (specified by vertex IDs), not including the random cost."""
         spatial_penalty = self.vertices.distance(x_id, y_id) ** self.zeta
         weight_penalty = (self.weight(x_id) * self.weight(y_id)) ** self.mu
@@ -69,15 +66,15 @@ def _power_law_sample(vertices: VertexSet, tau: float, scaling: Callable[[float]
     return dict(zip(vertices.names, weight_array))
 
 
-def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexSet], Dict[Any, float]]:
-    """Returns a weight 'sampling function' for WeightedVertexSet which just returns the given dictionary of
-    weights."""
-    return lambda vertices: weights
+def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexSet], List[float]]:
+    """Takes a dictionary mapping vertex names to weights, and returns a constant weight 'sampling function' which just
+    returns a list mapping each vertex ID to its weight."""
+    return lambda vertices: [weights[vertices.id_to_name(i)] for i in range(len(weights))]
 
 
-def from_degrees_generator(degrees: Dict[Any, int]) -> Callable[[VertexSet], Dict[Any, float]]:
+def from_degrees_generator(degrees: Dict[Any, int]) -> Callable[[VertexSet], List[float]]:
     """Returns a weight sampling function for WeightedVertexSet which 'samples' weights by estimating them based on
-    a supplied dictionary mapping vertex IDs to vertex degrees in the base graph. Used for the Gowalla dataset.
+    a supplied dictionary mapping vertex names to vertex degrees in the base graph. Used for the Gowalla dataset.
 
     IMPORTANT: We really don't understand why this seems to work. Do not submit the paper before we do. A more
     principled approach is likely going to need our estimated value of alpha. John thinks the ideologically correct
@@ -99,8 +96,8 @@ def from_degrees_generator(degrees: Dict[Any, int]) -> Callable[[VertexSet], Dic
     average_degree = sum(degrees.values()) / len(degrees)
     penalty = 2 * average_degree / 3
 
-    def weight_estimate(id_: Any) -> float:
-        return max(1., degrees[id_] - penalty)
+    def weight_estimate(name: Any) -> float:
+        return max(1., degrees[name] - penalty)
 
-    weights = {id_: weight_estimate(id_) for id_ in degrees.keys()}
+    weights = {name: weight_estimate(name) for name in degrees.keys()}
     return fixed_weights_generator(weights)

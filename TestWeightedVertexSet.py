@@ -15,29 +15,34 @@ class BasicTests(unittest.TestCase):
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
         self.vertices.setPointsFromNames(points)
 
-    def testFromDegrees(self):
+        self.id_1 = self.vertices.name_to_id(1)
+        self.id_2 = self.vertices.name_to_id(2)
+        self.id_abc = self.vertices.name_to_id("abc")
+
+    def testFixedWeights(self):
         output = self.generator(self.vertices)
-        self.assertEqual(self.weights[1], output[1])
-        self.assertEqual(self.weights[2], output[2])
-        self.assertEqual(self.weights["abc"], output["abc"])
+
+        self.assertEqual(self.weights[1], output[self.id_1])
+        self.assertEqual(self.weights[2], output[self.id_2])
+        self.assertEqual(self.weights["abc"], output[self.id_abc])
 
     def testWeightedVertexData(self):
         mu = 2.
         zeta = 3.
         data = WeightedVertexSet(self.vertices, self.generator, mu=mu, zeta=zeta)
 
-        self.assertEqual(self.weights[1], data.weight(1))
-        self.assertEqual(self.weights[2], data.weight(2))
-        self.assertEqual(self.weights["abc"], data.weight("abc"))
+        self.assertEqual(self.weights[1], data.weight(self.id_1))
+        self.assertEqual(self.weights[2], data.weight(self.id_2))
+        self.assertEqual(self.weights["abc"], data.weight(self.id_abc))
 
         data.resample_weights()
-        self.assertEqual(self.weights[1], data.weight(1))
-        self.assertEqual(self.weights[2], data.weight(2))
-        self.assertEqual(self.weights["abc"], data.weight("abc"))
+        self.assertEqual(self.weights[1], data.weight(self.id_1))
+        self.assertEqual(self.weights[2], data.weight(self.id_2))
+        self.assertEqual(self.weights["abc"], data.weight(self.id_abc))
 
-        self.assertEqual(2.5 ** mu * 2 ** zeta, data.penalty(1, 2))
-        self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(2, "abc"))
-        self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(1, "abc"), delta=1e-13)
+        self.assertEqual(2.5 ** mu * 2 ** zeta, data.penalty(self.id_1, self.id_2))
+        self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(self.id_2, self.id_abc))
+        self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(self.id_1, self.id_abc), delta=1e-13)
 
     def testResample(self):
         """Checks that resample_weights is actually resampling every vertex weight."""
@@ -65,12 +70,16 @@ class TestFromDegrees(unittest.TestCase):
         vertices = VertexSet(dimension=2, metric=euclideanDistanceFunction(d=2))
         points = {1: (0, 0), 2: (1, 1), "abc": (2, 2), "def": (3, 3)}
         vertices.setPointsFromNames(points)
-
         output = generator(vertices)
-        self.assertEqual(20., output[1])
-        self.assertEqual(1., output[2])
-        self.assertEqual(40., output["abc"])
-        self.assertEqual(1., output["def"])
+
+        id_1 = vertices.name_to_id(1)
+        self.assertEqual(20., output[id_1])
+        id_2 = vertices.name_to_id(2)
+        self.assertEqual(1., output[id_2])
+        id_abc = vertices.name_to_id("abc")
+        self.assertEqual(40., output[id_abc])
+        id_def = vertices.name_to_id("def")
+        self.assertEqual(1., output[id_def])
 
 
 class TestPowerLaw(unittest.TestCase):
