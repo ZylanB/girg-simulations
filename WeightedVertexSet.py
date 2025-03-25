@@ -38,7 +38,7 @@ class WeightedVertexSet:
 
 
 def power_law_generator(tau: float, ell: Callable[[float], float] = id,
-                        generator: Optional[np.random.Generator] = None) -> Callable[[VertexSet], Dict[Any, float]]:
+                        generator: Optional[np.random.Generator] = None) -> Callable[[VertexSet], List[float]]:
     """Returns a weight sampling function for WeightedVertexSet which samples weights W i.i.d. from a power law, taking
     Pr(W >= x) = 1 / x^{\tau - 1} and using the specified RNG, then applies the given scaling map to each weight."""
     if tau <= 2:
@@ -50,7 +50,7 @@ def power_law_generator(tau: float, ell: Callable[[float], float] = id,
 
 
 def _power_law_sample(vertices: VertexSet, tau: float, scaling: Callable[[float], float],
-                      generator: np.random.Generator) -> Dict[Any, float]:
+                      generator: np.random.Generator) -> List[float]:
     """Samples weights W for the given VertexSet i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
     and using the specified RNG, then applies the given scaling map to each weight."""
 
@@ -62,8 +62,7 @@ def _power_law_sample(vertices: VertexSet, tau: float, scaling: Callable[[float]
         weights = efficient_ell(weights)
 
     # We map an arbitrary weight to each vertex ID since they're all i.i.d. anyway.
-    weight_array = np.asarray(weights)
-    return dict(zip(vertices.names, weight_array))
+    return weights
 
 
 def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexSet], List[float]]:
