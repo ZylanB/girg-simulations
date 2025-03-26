@@ -171,6 +171,6 @@ def fpp_generator(lambda_: float, generator: Optional[np.random.Generator] = Non
     return lambda: generator.exponential(scale=lambda_)
 
 
-def unit_generator() -> Callable[[], float]:
-    """Edge cost generator for testing purposes that sets the random part of all edge costs to 1."""
-    return lambda: 1.0
+def constant_generator(c: float) -> Callable[[], float]:
+    """Edge cost generator for testing purposes that sets the random part of all edge costs to the given constant."""
+    return lambda: c

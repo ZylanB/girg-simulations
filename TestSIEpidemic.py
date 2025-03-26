@@ -34,11 +34,11 @@ class BasicTests(unittest.TestCase):
                       (self.a_id, self.c_id), (self.a_id, self.e_id)]
         edge_generator = fixed_graph_generator(edges=self.edges)
         self.unpenalised_epidemic = SIEpidemic(vertex_set=unpenalised_vertices, edge_generator=edge_generator,
-                                               edge_cost_generator=unit_generator())
+                                               edge_cost_generator=constant_generator(1.))
         self.unpenalised_epidemic.run_infection(self.a_id)
 
         self.penalised_epidemic = SIEpidemic(vertex_set=penalised_vertices, edge_generator=edge_generator,
-                                             edge_cost_generator=unit_generator())
+                                             edge_cost_generator=constant_generator(1.))
         self.penalised_epidemic.run_infection(self.a_id)
 
     def test_unpenalised_properties(self):
@@ -138,6 +138,14 @@ class BasicTests(unittest.TestCase):
 
 class EdgeCostTests(unittest.TestCase):
     pass
+    def test_constant_cost(self):
+        generator = constant_generator(1.)
+        for _ in range(10):
+            self.assertEqual(generator(), 1.0)
+
+        generator = constant_generator(1.5)
+        for _ in range(10):
+            self.assertEqual(generator(), 1.5)
 
 
 class GIRGTests(unittest.TestCase):
