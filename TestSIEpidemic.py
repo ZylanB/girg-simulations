@@ -1,7 +1,12 @@
 import unittest
+import math
+from collections import defaultdict
+from TestDistribution import dkw_p_value
+from scipy.stats import binom
+
 from SIEpidemic import *
 from WeightedVertexSet import fixed_weights_generator, WeightedVertexSet
-from VertexSet import VertexSet, euclidean_distance_function
+from VertexSet import VertexSet, euclidean_distance_function, lattice
 
 
 class BasicTests(unittest.TestCase):
@@ -137,7 +142,6 @@ class BasicTests(unittest.TestCase):
 
 
 class EdgeCostTests(unittest.TestCase):
-    pass
     def test_constant_cost(self):
         generator = constant_generator(1.)
         for _ in range(10):
@@ -147,9 +151,176 @@ class EdgeCostTests(unittest.TestCase):
         for _ in range(10):
             self.assertEqual(generator(), 1.5)
 
+    def test_fpp_cost(self):
+        entropy = 252869566619441809084118758734182862550  # Generated from numpy via SeedSequence().entropy
+        generator = np.random.default_rng(seed=entropy)
+        lambda_ = 1
+        cost_generator = fpp_generator(lambda_, generator=generator)
+
+        n = 100000
+        costs = [cost_generator() for i in range(n)]
+
+        # Split into buckets
+        bucket_width = 0.3
+        cost_counts = defaultdict(lambda: 0)
+        for cost in costs:
+            bucket = math.floor(cost / bucket_width)
+            cost_counts[bucket] += 1
+
+        def exponential_cdf(x):
+            return 1 - math.exp(-lambda_ * x)
+
+        # Probability of landing in bucket i under the correct distribution
+        def target_pmf(i):
+            return exponential_cdf(bucket_width * (i+1)) - exponential_cdf(bucket_width * i)
+
+        # Check for stupid calculation errors
+        self.assertAlmostEqual(sum([target_pmf(i) for i in range(100)]), 1, delta=0.01)
+
+        p_value = dkw_p_value(sample_data=cost_counts, pmf=target_pmf, tvd_bound=0.01)
+        self.assertEqual(1.634472214616812e-06, p_value)
+
 
 class GIRGTests(unittest.TestCase):
-    pass
+    def setUp(self):
+        self.alpha = 1.25
+
+    def test_1d(self):
+        """Generate 4-vertex 1-d GIRGs. All but two edges are present with certainty; check that these are always
+        present and that the other two are present independently with the right connection probabilities."""
+        entropy = 99587849537254950220960273702174246406  # Generated from numpy via SeedSequence().entropy
+        generator = np.random.default_rng(seed=entropy)
+
+        unweighted_vertices = lattice(dimension=1, size=4)
+        id_a = unweighted_vertices.position_to_id((0.,))
+        id_b = unweighted_vertices.position_to_id((1.,))
+        id_c = unweighted_vertices.position_to_id((2.,))
+        id_d = unweighted_vertices.position_to_id((3.,))
+
+        weights = {id_a: 1.1, id_b: 1.2, id_c: 1.3, id_d: 1.4}
+        weight_gen = fixed_weights_generator(weights)
+        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen, mu=0., zeta=0.)
+
+        graph_gen = girg_generator(alpha=self.alpha, scale_factor=.25, generator=generator)
+        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=constant_generator(0.),
+                              edge_generator=graph_gen)
+
+        vertex_a = epidemic.graph.vertex(id_a)
+        vertex_b = epidemic.graph.vertex(id_b)
+        vertex_c = epidemic.graph.vertex(id_c)
+        vertex_d = epidemic.graph.vertex(id_d)
+
+        # All unit-length edges should be present with certainty (remembering we're on the torus). Other edges
+        # should be present with probability (W_uW_v/|u-v|)^alpha = (W_uW_v/2)^alpha.
+        ac_probability = (1.1 * 1.3 / 2.) ** self.alpha
+        bd_probability = (1.2 * 1.4 / 2.) ** self.alpha
+
+        def edge_is_present(u, v):
+            return epidemic.graph.edge(u, v) is not None or epidemic.graph.edge(v, u) is not None
+
+        # Lsb of key is whether ac is present, msb is whether bd is present.
+        edges_present = {0: 0, 1: 0, 2: 0, 3: 0}
+
+        for i in range(100000):
+            if i % 10000 == 0:
+                print(f"Test run {i//1000}k/100k")
+            epidemic.sample_edges()
+
+            # Even though the graph is undirected, edges are still stored as tuples.
+            guaranteed_edges = [(vertex_a, vertex_b), (vertex_b, vertex_c), (vertex_c, vertex_d), (vertex_d, vertex_a)]
+            for edge in guaranteed_edges:
+                self.assertTrue(edge_is_present(edge[0], edge[1]))
+
+            key = 1 if edge_is_present(vertex_a, vertex_c) else 0
+            key += 2 if edge_is_present(vertex_b, vertex_d) else 0
+            edges_present[key] += 1
+
+        def target_pmf(x):
+            if x == 0:
+                return (1 - ac_probability) * (1 - bd_probability)
+            if x == 1:
+                return ac_probability * (1 - bd_probability)
+            if x == 2:
+                return (1 - ac_probability) * bd_probability
+            if x == 3:
+                return ac_probability * bd_probability
+            return 0
+
+        p_value = dkw_p_value(sample_data=edges_present, pmf=target_pmf, tvd_bound=0.01)
+        self.assertEqual(1.296155806256856e-07, p_value)
+
+    def test_2d(self):
+        """Generate 9-vertex 2-d GIRGs with unit weights. Check that all edges that should be present are present,
+        and that the total number of edges has the correct distribution."""
+        entropy = 257965182494033889699734564010582594886  # Generated from numpy via SeedSequence().entropy
+        generator = np.random.default_rng(seed=entropy)
+
+        unweighted_vertices = lattice(dimension=2, size=3)
+        id_a = unweighted_vertices.position_to_id((0., 0.))
+        id_b = unweighted_vertices.position_to_id((1., 0.))
+        id_c = unweighted_vertices.position_to_id((2., 0.))
+        id_d = unweighted_vertices.position_to_id((0., 1.))
+        id_e = unweighted_vertices.position_to_id((1., 1.))
+        id_f = unweighted_vertices.position_to_id((2., 1.))
+        id_g = unweighted_vertices.position_to_id((0., 2.))
+        id_h = unweighted_vertices.position_to_id((1., 2.))
+        id_i = unweighted_vertices.position_to_id((2., 2.))
+
+        weights = {id_a: 1., id_b: 1., id_c: 1., id_d: 1., id_e: 1., id_f: 1., id_g: 1., id_h: 1., id_i: 1.}
+        weight_gen = fixed_weights_generator(weights)
+        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen, mu=0., zeta=0.)
+
+        graph_gen = girg_generator(alpha=self.alpha, scale_factor=1/3, generator=generator)
+        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=constant_generator(0.),
+                              edge_generator=graph_gen)
+
+        vertex_a = epidemic.graph.vertex(id_a)
+        vertex_b = epidemic.graph.vertex(id_b)
+        vertex_c = epidemic.graph.vertex(id_c)
+        vertex_d = epidemic.graph.vertex(id_d)
+        vertex_e = epidemic.graph.vertex(id_e)
+        vertex_f = epidemic.graph.vertex(id_f)
+        vertex_g = epidemic.graph.vertex(id_g)
+        vertex_h = epidemic.graph.vertex(id_h)
+        vertex_i = epidemic.graph.vertex(id_i)
+
+        # All edges are either unit-length or diagonals (since we're on the torus). Unit-length edges should be
+        # present with certainty. Diagonals should be present with probability (W_u*W_v/||u-v||^d)^\alpha, which
+        # here is just 2^{-\alpha}.
+        diag_probability = 2 ** (-self.alpha)
+
+        def edge_is_present(u, v):
+            return epidemic.graph.edge(u, v) is not None or epidemic.graph.edge(v, u) is not None
+
+        # 9 vertices with 4 diagonal edges each = 18 possible edges.
+        edges_present = {i: 0 for i in range(19)}
+
+        for i in range(100000):
+            if i % 10000 == 0:
+                print(f"Test run {i // 1000}k/100k")
+            epidemic.sample_edges()
+
+            # Even though the graph is undirected, edges are still stored as tuples.
+            guaranteed_edges = [(vertex_a, vertex_b), (vertex_a, vertex_c), (vertex_a, vertex_d), (vertex_a, vertex_g),
+                                (vertex_b, vertex_c), (vertex_b, vertex_e), (vertex_b, vertex_h), (vertex_c, vertex_f),
+                                (vertex_c, vertex_i), (vertex_d, vertex_e), (vertex_d, vertex_f), (vertex_d, vertex_g),
+                                (vertex_e, vertex_f), (vertex_e, vertex_h), (vertex_f, vertex_i), (vertex_g, vertex_h),
+                                (vertex_g, vertex_i), (vertex_h, vertex_i)]
+            diagonal_edges = [(vertex_a, vertex_h), (vertex_a, vertex_e), (vertex_a, vertex_i), (vertex_a, vertex_f),
+                              (vertex_b, vertex_d), (vertex_b, vertex_g), (vertex_b, vertex_f), (vertex_b, vertex_i),
+                              (vertex_c, vertex_d), (vertex_c, vertex_e), (vertex_c, vertex_g), (vertex_c, vertex_h),
+                              (vertex_d, vertex_h), (vertex_d, vertex_i), (vertex_e, vertex_g), (vertex_e, vertex_i),
+                              (vertex_f, vertex_g), (vertex_f, vertex_h)]
+
+            for edge in guaranteed_edges:
+                self.assertTrue(edge_is_present(edge[0], edge[1]))
+
+            count = len([e for e in diagonal_edges if edge_is_present(e[0], e[1])])
+            edges_present[count] += 1
+
+        target_pmf = lambda x: binom.pmf(k=x, n=18, p=diag_probability)
+        p_value = dkw_p_value(sample_data=edges_present, pmf=target_pmf, tvd_bound=0.01)
+        self.assertEqual(9.284880547544271e-07, p_value)
 
 
 if __name__ == '__main__':

@@ -131,30 +131,46 @@ class SIEpidemic:
         return len(self.infection_path(vertex_id)) - 1
 
 
-def girg_generator(alpha: float, scale_factor: float, average_degree: Optional[float] = None,
-                   seed: Optional[int] = None) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
+def girg_generator(alpha: float, scale_factor: float, generator: Optional[np.random.Generator] = None,
+                   average_degree: Optional[float] = None) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
     """Generates an SIEpidemic whose graph is a GIRG on the given vertex_set with the given long-range parameter
-    alpha and the given RNG seed. The GIRG sampling library unfortunately works in [0,1]^d, with the connection
-    probability from u to v given by min(1, W_uW_v/n||u-v||^d)^alpha - as such, before we pass positions in,
-    we need to scale our space down to fit in [0,1]. The correct scale factor is E(#(vertices))^{1/d}. If
+    alpha and the given RNG seed. The connection probability between u and v is max(1, W_uW_v/|u-v|^d)^\alpha. If
     average_degree is set then the GIRG library uses binary search to find a constant c to scale the weights by which
-    gives the appropriate average degree. If seed is not set then the sampling library takes care of it."""
-    def generator(vertex_set: WeightedVertexSet) -> List[Tuple[Any, Any]]:
+    gives the appropriate average degree. The generator here should only be used for testing purposes, in which case
+    it will be used to generate random seeds - otherwise you should leave this as None and let the sampling library
+    generate its own seed.
+
+    The GIRG generation code we're using requires everything to be scaled down to [0,1]^d, using connection probability
+    max(1, W_uW_v/n|u-v|^d)^\alpha, and we don't want to change that. As long as we're working in [0, n^{1/d}]^d, this
+    is equivalent to scaling everything down by a factor of n^{1/d}. The one catch is that we need to pass this in as
+    an argument rather than generating it from the vertex set, since otherwise if we have a PPP with slightly less than
+    n points then we might end up with points outside [0, 1]^d and the generation code will crash. So instead we pass
+    1/n^{1/d} in as the scale_factor argument."""
+    def generator_to_return(vertex_set: WeightedVertexSet) -> List[Tuple[Any, Any]]:
+        seed = None
+        if generator:
+            seed = generator.integers(low=0, high=2**31)  # girg-sampling takes 31-bit seeds, "high" is not inclusive.
+
         weights = [vertex_set.weight(i) for i in range(vertex_set.size)]
 
+        """The GIRG generator creates a GIRG with connection probability between u and v given by max(1, 
+        W_uW_v/n|u-v|^d)^alpha. It also requires all points to lie in [0,1]^d. So we need to scale everything down by 
+        a factor of n^{1/d}."""
         positions = [vertex_set.id_to_position(i) for i in range(vertex_set.size)]
         scaled_positions = []
         for position in positions:
-            scaled_positions.append([position[i] / scale_factor for i in range(vertex_set.dimension)])
+            scaled_position = [position[i] * scale_factor for i in range(vertex_set.dimension)]
+            scaled_positions.append(scaled_position)
 
         if average_degree is not None:
             c = gs.scaleWeights(weights=weights, desiredAvgDegree=average_degree, dimension=vertex_set.dimension,
                                 alpha=alpha)
             weights = [c * weight for weight in weights]
 
-        return gs.generateEdges(weights=weights, positions=scaled_positions, alpha=alpha, seed=seed)
+        return gs.generateEdges(weights=weights, positions=scaled_positions, alpha=alpha,
+                                scale=scale_factor ** vertex_set.dimension, seed=seed)
 
-    return generator
+    return generator_to_return
 
 
 def fixed_graph_generator(edges: List[Tuple[int, int]]) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
