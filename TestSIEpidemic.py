@@ -342,8 +342,8 @@ class FileIOTests(unittest.TestCase):
         saved_value = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen)
         saved_value.run_infection(np.random.randint(10000))
 
-        saved_value.save_to_file("/home/john", "test_graph")
-        loaded_value = SIEpidemic.load_from_file("/home/john", "test_graph")
+        saved_value.save_to_file(".", "test_graph")
+        loaded_value = SIEpidemic.load_from_file(".", "test_graph")
 
         saved_vertices = saved_value.vertex_set
         loaded_vertices = loaded_value.vertex_set
