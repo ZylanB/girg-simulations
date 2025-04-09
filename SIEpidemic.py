@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+import dill  # Extension of pickle that supports encoding/decoding functions.
+
 import numpy as np
 import graph_tool as gt
 from graph_tool.topology import shortest_distance
 import girg_sampling.girgs as gs
+import os.path
 
-from WeightedVertexSet import WeightedVertexSet
+from WeightedVertexSet import WeightedVertexSet, fixed_weights_generator
 from typing import Any, Callable, List, Optional, Tuple
+from VertexSet import lattice
 
 
 class SIEpidemic:
@@ -20,6 +26,7 @@ class SIEpidemic:
         self.graph = gt.Graph(directed=False)
         self.graph.add_vertex(n=self.vertex_set.size)
         self.edge_costs = self.graph.new_edge_property("double")
+        self.graph.edge_properties["edge_costs"] = self.edge_costs
 
         self.sample_edges()
         self.sample_edge_costs()
@@ -28,7 +35,9 @@ class SIEpidemic:
         # Uninfected vertices have infinite infection time. Vertices without an infector (including the source vertex)
         # have infector id -1.
         self.infection_times = self.graph.new_vertex_property("double")
+        self.graph.vertex_properties["infection_times"] = self.infection_times
         self.infectors = self.graph.new_vertex_property("int64_t")
+        self.graph.vertex_properties["infectors"] = self.infectors
         self.initial_vertex = None
 
     def sample_edges(self):
@@ -129,6 +138,47 @@ class SIEpidemic:
             return None
 
         return len(self.infection_path(vertex_id)) - 1
+
+    def save_to_file(self, folder: str, name: str):
+        """Logs all data in the current epidemic to the given file in pickle format. The epidemic will be saved in two
+        files, one name.gt file and one name.pickle file."""
+        with open(os.path.join(folder, name + ".pickle"), "wb") as file:
+            dill.dump(self.vertex_set, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.edge_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.edge_cost_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+
+        self.graph.save(os.path.join(folder, name + ".gt"))
+
+    @staticmethod
+    def _empty_epidemic() -> SIEpidemic:
+        """Creates an empty SIEpidemic object which can be initialised manually. Used when loading from files."""
+        unweighted_vertices = lattice(size=1, dimension=1)
+        weight_gen = fixed_weights_generator(weights={0: 1})
+        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen, mu=1., zeta=1.)
+        edge_gen = fixed_graph_generator([])
+        cost_gen = lambda: 0
+        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen)
+
+    @staticmethod
+    def load_from_file(folder: str, name: str) -> SIEpidemic:
+        """Loads an SIEpidemic saved via the save_to_file method as name.gt and name.pickle and returns the resulting
+        object."""
+        with open(os.path.join(folder, name + ".pickle"), "rb") as file:
+            vertices = dill.load(file)
+            edge_gen = dill.load(file)
+            cost_gen = dill.load(file)
+            graph = gt.load_graph(os.path.join(folder, name + ".gt"))
+
+            return_value = SIEpidemic._empty_epidemic()
+            return_value.vertex_set = vertices
+            return_value.edge_generator = edge_gen
+            return_value.edge_cost_generator = cost_gen
+            return_value.graph = graph
+            return_value.infection_times = graph.vertex_properties["infection_times"]
+            return_value.infectors = graph.vertex_properties["infectors"]
+            return_value.edge_costs = graph.edge_properties["edge_costs"]
+
+            return return_value
 
 
 def girg_generator(alpha: float, scale_factor: float, generator: Optional[np.random.Generator] = None,

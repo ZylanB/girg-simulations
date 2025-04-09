@@ -20,7 +20,8 @@ class WeightedVertexSet:
 
     def __getattr__(self, item):
         """Delegation, allows use of members and methods from VertexSet without formal inheritance."""
-        return getattr(self.vertices, item)
+        vertices = object.__getattribute__(self, 'vertices')
+        return getattr(vertices, item)
 
     def weight(self, id_: int) -> float:
         """Returns the weight of the vertex with the given id."""
