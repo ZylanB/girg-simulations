@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 import datetime
 import requests
-import tarfile
+import gzip
 from collections import defaultdict
 from pathlib import Path
+import shutil
 import dill
 
 import numpy as np
@@ -59,11 +60,12 @@ class GowallaSIEpidemic(SIEpidemic):
 
     @staticmethod
     def _obtain_data_file(url: str, dest_path: Path):
-        """Downloads the given .gz (not .tar.gz) file from the given URL, untars it in the given folder, and deletes
-        the original .gz file."""
-        dest_path.mkdir(parents=True, exist_ok=True)
+        """Downloads the given .gz (not .tar.gz) file from the given URL, unzips it in the given folder to the given
+        name, and deletes the original .gz file."""
+        dest_folder = dest_path.parent
+        dest_folder.mkdir(parents=True, exist_ok=True)
 
-        local_file = dest_path / Path(url).name
+        local_file = dest_folder / Path(url).name
         print(f"Downloading from {url} to {local_file}...")
 
         with requests.get(url, stream=True) as response:
@@ -75,8 +77,8 @@ class GowallaSIEpidemic(SIEpidemic):
         print("Download completed.")
 
         print("Extracting archive...")
-        with tarfile.open(local_file, "r:gz") as tar:
-            tar.extractall(path=dest_path)
+        with gzip.open(local_file, "rb") as gz, open(dest_path, mode="wb") as out:
+            shutil.copyfileobj(gz, out)
         print("Extraction completed.")
 
         print(f"Deleting temporary file {local_file}...")
@@ -87,9 +89,9 @@ class GowallaSIEpidemic(SIEpidemic):
     def _obtain_gowalla_data(cls):
         """Downloads any of the Gowalla data not already present locally."""
         if not cls._VERTEX_DATA_PATH.exists():
-            cls._obtain_data_file(url=cls._VERTEX_DATA_URL, dest_path=cls._VERTEX_DATA_PATH.parent)
+            cls._obtain_data_file(url=cls._VERTEX_DATA_URL, dest_path=cls._VERTEX_DATA_PATH)
         if not cls._EDGE_DATA_PATH.exists():
-            cls._obtain_data_file(url=cls._EDGE_DATA_URL, dest_path=cls._EDGE_DATA_PATH.parent)
+            cls._obtain_data_file(url=cls._EDGE_DATA_URL, dest_path=cls._EDGE_DATA_PATH)
 
     @classmethod
     def _create_gowalla_graph(cls):
@@ -109,7 +111,10 @@ class GowallaSIEpidemic(SIEpidemic):
             -> Tuple[float, float]:
         """Given a list of CheckIns for a user, return their modal position after rounding latitude and longitude to
         two decimal places, roughly a half-mile radius. In the event of a tie, choose randomly (using the generator
-        provided)."""
+        provided). There is clearly some discretisation happening in the Gowalla dataset as latitudes/longitudes
+        wouldn't normally match to 8 decimal places, but it's on a much smaller scale than a half-mile radius. (The
+        original Gowalla paper uses a 25x25km grid, but for us using a finer grid prevents too many vertices from being
+        placed at the same location.)"""
         if generator is None:
             generator = np.random.default_rng()
 
@@ -121,7 +126,7 @@ class GowallaSIEpidemic(SIEpidemic):
             discretised_position = (round(check_in.latitude, 2), round(check_in.longitude, 2))
             position_counts[discretised_position] += 1
 
-        max_position_count = max(position_counts, key=position_counts.get)
+        max_position_count = max(position_counts.values())
         modal_positions = [pos for pos, count in position_counts.items() if count == max_position_count]
         return modal_positions[generator.integers(0, len(modal_positions))]
 
