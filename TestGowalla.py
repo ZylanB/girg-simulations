@@ -27,7 +27,7 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(id_1, 4466)
 
 
-# @unittest.skip("Let's not hammer the SNAP server unless we really want to test downloading specifically.")
+@unittest.skip("Let's not hammer the SNAP server unless we really want to test downloading specifically.")
 class DownloadTests(unittest.TestCase):
     def test_download(self):
         """Deletes the data, then attempts to re-download it. Asserts the resulting files exist and have non-zero

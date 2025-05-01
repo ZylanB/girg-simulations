@@ -228,7 +228,7 @@ class GowallaDataReader:
                 id_0, id_1 = cls._parse_edge_line(line)
                 if id_0 not in vertex_names or id_1 not in vertex_names:
                     continue
-                # Each edge appears twice, once in each direction. TODO add a unit test for this.
+                # Each edge appears twice, once in each direction.
                 if id_0 < id_1:
                     edge_list.append([vertices.name_to_id(id_0), vertices.name_to_id(id_1)])
 
