@@ -19,6 +19,7 @@ from VertexSet import VertexSet, earth_distance
 
 @dataclass(slots=True)
 class CheckIn:
+    """Holds a single raw user check-in from the corresponding data file."""
     user_id: int
     time: datetime.datetime
     latitude: float
@@ -34,23 +35,24 @@ class CheckIn:
                        latitude=float(sections[2]), longitude=float(sections[3]), location_id=int(sections[4]))
 
 
-@dataclass(slots=True)
-class User:
-    user_id: int
-    position: Tuple[float, float]
-
-
 @dataclass
 class TieDatum:
+    """Contains information about a user whose position is ambiguous from the check-in data file. The (discretised)
+    possibilities are contained in modal_positions as latitude/longitude pairs."""
     user_id: int
     modal_positions: List[Tuple[float, float]]
 
     @property
     def max_distance(self):
+        """Returns the maximum possible difference our choice of position for the user could make, i.e. the maximum
+        distance between any pair of coordinates in self.modal_positions."""
         return max([earth_distance(x, y) for x in self.modal_positions for y in self.modal_positions])
 
 
 class GowallaDataReader:
+    """Creates the Gowalla dataset from scratch, downloading the relevant files from _VERTEX_DATA_URL and
+    _EDGE_DATA_URL and storing them at _VERTEX_DATA_PATH and _EDGE_DATA_PATH if need be. vertex_path is the path to
+    save pickled vertex data to, and edge_path is the path to save pickled edge data to."""
     _VERTEX_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_totalCheckins.txt.gz"
     _EDGE_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_edges.txt.gz"
     _VERTEX_DATA_PATH = Path.cwd() / "Gowalla_totalCheckins.txt"
@@ -68,6 +70,7 @@ class GowallaDataReader:
         self.edge_list = self._create_edges(self.vertices)
 
     def save_files(self):
+        """Saves the recreated Gowalla data in pickled form to self.vertex_path and self.edge_path."""
         if not (self.vertex_path and self.edge_path):
             raise RuntimeError("Attempting to save data to an empty path.")
 
@@ -116,13 +119,13 @@ class GowallaDataReader:
 
     @classmethod
     def _snap_data_present(cls):
+        """Returns true if all the raw Gowalla data has already been downloaded from the SNAP site."""
         return cls._VERTEX_DATA_PATH.exists() and cls._EDGE_DATA_PATH.exists()
 
     def _create_vertices(self) -> Tuple[WeightedVertexSet, List[TieDatum]]:
-        """Pulls the vertex set for the Gowalla dataset from loc-gowalla-totalCheckins.txt at the specified path,
-        available for download at https://snap.stanford.edu/data/loc-gowalla.html, adds weights, and pickles it to
-        GOWALLA_VERTEX_PATH. Mu and zeta are both initialised to 0. Nodes without position information from check-ins
-        are omitted."""
+        """Reads in the raw vertex data for the Gowalla dataset (downloading it first if needed), adds weights based
+        on vertex degrees, and returns the resulting vertex set with mu and zeta initialised to 0. Nodes without
+        position information from check-ins are omitted from the vertex set."""
         if not self._snap_data_present():
             self._obtain_snap_data()
 
@@ -208,9 +211,10 @@ class GowallaDataReader:
         return int(id_strings[0]), int(id_strings[1])
 
     @classmethod
-    def _create_edges(cls, vertices: WeightedVertexSet):
-        """Reads the edge set for the Gowalla dataset from GOWALLA_EDGE_PATH and pickles it to GOWALLA_EDGE_PATH.
-        Takes the vertex set as an argument since vertices without positional data should not be included."""
+    def _create_edges(cls, vertices: WeightedVertexSet) -> List[List[int]]:
+        """Reads the edge set for the Gowalla dataset, downloading it first if needed, and returns the resulting list
+        of vertex ID pairs. Takes the vertex set as an argument since vertices without positional data should not be
+        included, and calculating this is slow enough that we don't want to do it twice."""
         if not cls._snap_data_present():
             cls._obtain_snap_data()
 
@@ -232,6 +236,8 @@ class GowallaDataReader:
 
 
 class GowallaSIEpidemic(SIEpidemic):
+    """An SIEpidemic on the Gowalla graph. Creates the Gowalla data from scratch using a GowallaDataReader if needed,
+    otherwise just unpickles it."""
     _SAVED_VERTEX_PATH = Path.cwd() / "gowalla_vertices.pickle"
     _SAVED_EDGE_PATH = Path.cwd() / "gowalla_edges.pickle"
 
@@ -247,11 +253,12 @@ class GowallaSIEpidemic(SIEpidemic):
 
     @classmethod
     def _saved_graph_present(cls):
+        """Returns true if the WeightedVertexSet and edge list of the Gowalla graph have already been saved locally."""
         return cls._SAVED_VERTEX_PATH.exists() and cls._SAVED_EDGE_PATH.exists()
 
     def _load_vertices(self, mu: float, zeta: float) -> WeightedVertexSet:
-        """Reads the vertex set for the Gowalla dataset from VERTEX_DATA_PATH, creating it first if it doesn't
-        exist, and returns a WeightedVertexSet with the appropriate penalties mu and zeta."""
+        """Reads the vertex set for the Gowalla dataset from VERTEX_DATA_PATH and returns a WeightedVertexSet with
+        the appropriate penalties mu and zeta."""
         print("Loading vertex set...")
         with open(self._SAVED_VERTEX_PATH, "rb") as file:
             return_set = dill.load(file)
@@ -261,8 +268,8 @@ class GowallaSIEpidemic(SIEpidemic):
         return return_set
 
     def _load_edges(self) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
-        """Reads the edge set for the Gowalla dataset from EDGE_DATA_PATH, creating it first if it doesn't exist,
-        and returns an edge generator that can be passed into an SIEpidemic."""
+        """Reads the edge set for the Gowalla dataset from EDGE_DATA_PATH and returns an edge generator that can be
+        passed into an SIEpidemic."""
         print("Loading edge generator...")
         with open(self._SAVED_EDGE_PATH, "rb") as file:
             edges = dill.load(file)
@@ -271,6 +278,7 @@ class GowallaSIEpidemic(SIEpidemic):
 
 
 def plot_tie_data(data: List[TieDatum]):
+    """INTERNAL USE: Displays a plot that roughly indicates the quality of our current tie-breaking approach."""
     data = np.asarray([datum.max_distance for datum in data])
     bin_count = 50
 
