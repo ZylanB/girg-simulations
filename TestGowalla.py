@@ -62,27 +62,29 @@ class VertexPositionTests(unittest.TestCase):
 
     def test_position_calculation_rounding_close(self):
         # Will return (6, 7) at least half the time if any of the points near (3, 50) don't round correctly to (3, 50).
+        # Otherwise returns one of the four points close to (3, 50) chosen uniformly at random.
 
         check_ins = [
-            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=2.9951, longitude=50., location_id=0),
-            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3.0049, longitude=50., location_id=0),
-            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3., longitude=49.9951, location_id=0),
-            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3., longitude=50.0049, location_id=0),
+            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=2.8751, longitude=50., location_id=0),
+            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3.1249, longitude=50., location_id=0),
+            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3., longitude=49.8751, location_id=0),
+            CheckIn(user_id=10, time=datetime.datetime.now(), latitude=3., longitude=50.1249, location_id=0),
             CheckIn(user_id=10, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0),
             CheckIn(user_id=10, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0),
             CheckIn(user_id=10, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((3., 50.), self.instance._get_user_position(check_ins)[0])
+            position = self.instance._get_user_position(check_ins)[0]
+            self.assertIn(position, [(2.8751, 50.), (3.1249, 50.), (3., 49.8751), (3, 50.1249)])
 
     def test_position_calculation_rounding_far(self):
-        # Will return (10.25, 27) at least half the time if any of the points near (10.25, 27) round incorrectly to
-        # (10.25, 27).
+        # Will return a point near (10.25, 27) at least half the time if any of the points near (10.25, 27) round
+        # incorrectly to (10.25, 27). Otherwise, returns (6, 7).
         check_ins = [
-            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.2449, longitude=27., location_id=0),
-            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.2551, longitude=27., location_id=0),
-            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=26.9949, location_id=0),
-            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=27.0051, location_id=0),
+            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.1249, longitude=27., location_id=0),
+            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.3751, longitude=27., location_id=0),
+            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=26.8749, location_id=0),
+            CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=27.1251, location_id=0),
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=27., location_id=0),
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=10.25, longitude=27., location_id=0),
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0),
@@ -118,7 +120,7 @@ class VertexPositionTests(unittest.TestCase):
             return 0.
 
         p_value = dkw_p_value(sample_data=location_counts, pmf=target_pmf, tvd_bound=0.01)
-        self.assertEqual(0.00010194951487247018, p_value)
+        self.assertEqual(6.137472530978548e-09, p_value)
 
 
 class GraphTests(unittest.TestCase):

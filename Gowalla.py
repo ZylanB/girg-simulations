@@ -11,6 +11,7 @@ import shutil
 import dill
 
 import numpy as np
+import matplotlib.pyplot as plt
 from SIEpidemic import SIEpidemic, fixed_graph_generator
 from WeightedVertexSet import WeightedVertexSet, from_degrees_generator
 from VertexSet import VertexSet, earth_distance
@@ -43,6 +44,10 @@ class User:
 class TieDatum:
     user_id: int
     modal_positions: List[Tuple[float, float]]
+
+    @property
+    def max_distance(self):
+        return max([earth_distance(x, y) for x in self.modal_positions for y in self.modal_positions])
 
 
 class GowallaDataReader:
@@ -160,25 +165,39 @@ class GowallaDataReader:
         return weighted_vertices, ties
 
     def _get_user_position(self, check_in_list: List[CheckIn]) -> Tuple[Tuple[float, float], Optional[TieDatum]]:
-        """Given a list of CheckIns for a user, return their modal position after rounding latitude and longitude to
-        two decimal places, roughly a half-mile radius. In the event of a tie, choose randomly (using the generator
-        provided). There is clearly some discretisation happening in the Gowalla dataset as latitudes/longitudes
-        wouldn't normally match to 8 decimal places, but it's on a much smaller scale than a half-mile radius. (The
-        original Gowalla paper uses a 25x25km grid, but for us using a finer grid prevents too many vertices from being
-        placed at the same location.)"""
+        """Given a list of CheckIns for a user, discretise their positions to a (very) roughly 25kmx25km grid,
+        choose their most common position on that grid, then return a random CheckIn position restricted to that grid
+        square. NB this 25kmx25km grid is the same metric used in the original Gowalla paper, but also NB it's
+        implemented as .25x.25 boxes in latitude/longitude, so the actual size of the cells will change substantially
+        depending on the longitude."""
         if not check_in_list:
             raise ValueError("Check-in list is empty!")
 
-        position_counts = defaultdict(int)
-        for check_in in check_in_list:
-            discretised_position = (round(check_in.latitude, 2), round(check_in.longitude, 2))
-            position_counts[discretised_position] += 1
+        # Rounds x to the nearest .25
+        def discretise(x):
+            return round(4*x, 0)/4
 
-        max_position_count = max(position_counts.values())
-        modal_positions = [pos for pos, count in position_counts.items() if count == max_position_count]
+        position_dict = defaultdict(list)
+        for check_in in check_in_list:
+            disc_positions = (discretise(check_in.latitude), discretise(check_in.longitude))
+            position_dict[disc_positions].append((check_in.latitude, check_in.longitude))
+
+        max_position_count = max([len(x) for x in position_dict.values()])
+        modal_disc_positions = []
+        for disc_position, mapped_positions in position_dict.items():
+            if len(mapped_positions) == max_position_count:
+                modal_disc_positions.append(disc_position)
+
         user_id = check_in_list[0].user_id
-        tie_datum = None if len(modal_positions) == 1 else TieDatum(user_id=user_id, modal_positions=modal_positions)
-        return modal_positions[self.generator.integers(0, len(modal_positions))], tie_datum
+        if len(modal_disc_positions) == 1:
+            tie_datum = None
+        else:
+            tie_datum = TieDatum(user_id=user_id, modal_positions=modal_disc_positions)
+        disc_position_index = self.generator.integers(0, len(modal_disc_positions))
+        disc_positions = modal_disc_positions[disc_position_index]
+
+        position_index = self.generator.integers(0, len(position_dict[disc_positions]))
+        return position_dict[disc_positions][position_index], tie_datum
 
     @staticmethod
     def _parse_edge_line(line: bytes) -> Tuple[int, int]:
@@ -249,3 +268,32 @@ class GowallaSIEpidemic(SIEpidemic):
             edges = dill.load(file)
 
         return fixed_graph_generator(edges)
+
+
+def plot_tie_data(data: List[TieDatum]):
+    data = np.asarray([datum.max_distance for datum in data])
+    bin_count = 50
+
+    # Space bins evenly on a log scale.
+    bins = np.logspace(np.log10(data.min()), np.log10(data.max()), bin_count)
+
+    plt.figure()
+    plt.hist(data, bins=bins)
+    plt.xscale('log')
+    plt.xlabel('Max change in distance due to tie')
+    plt.ylabel('Number of ties')
+    plt.title(f"{len(data)} total ties")
+
+    pct_50, pct_75, pct_90 = np.percentile(data, [50, 75, 90])
+    for pct, label in zip([pct_50, pct_75, pct_90], ['50th percentile', '75th percentile', '90th percentile']):
+        plt.axvline(pct, linestyle='--')
+        plt.text(pct, plt.ylim()[1] * 0.9, label, rotation=90, va='top', fontsize='small')
+
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    test = GowallaDataReader()
+    plot_tie_data(test.tie_data)
