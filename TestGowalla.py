@@ -9,7 +9,7 @@ from TestDistribution import dkw_p_value
 class ParsingTests(unittest.TestCase):
     def test_checkin(self):
         # Copied from Gowalla_totalCheckins.txt
-        test_line = "2	2010-09-13T16:41:48Z	34.097924317	-118.325254783	1337593"
+        test_line = "2\t2010-09-13T16:41:48Z\t34.097924317\t-118.325254783\t1337593".encode("utf-8")
         test_checkin = CheckIn.from_line(test_line)
         self.assertEqual(test_checkin.user_id, 2)
         correct_time = datetime.datetime(year=2010, month=9, day=13, hour=16, minute=41, second=48)
@@ -36,7 +36,7 @@ class DownloadTests(unittest.TestCase):
         self.assertFalse(GowallaSIEpidemic._VERTEX_DATA_PATH.exists())
         self.assertFalse(GowallaSIEpidemic._EDGE_DATA_PATH.exists())
 
-        GowallaSIEpidemic._obtain_gowalla_data()
+        GowallaSIEpidemic._obtain_snap_data()
 
         self.assertTrue(GowallaSIEpidemic._VERTEX_DATA_PATH.exists())
         self.assertGreater(GowallaSIEpidemic._VERTEX_DATA_PATH.stat().st_size, 0)
@@ -44,10 +44,12 @@ class DownloadTests(unittest.TestCase):
         self.assertGreater(GowallaSIEpidemic._EDGE_DATA_PATH.stat().st_size, 0)
 
 
-class VertexTests(unittest.TestCase):
+class VertexPositionTests(unittest.TestCase):
     def setUp(self):
         entropy = 89654657203871215244168134687054070552
-        self.generator = np.random.default_rng(seed=entropy)
+        generator = np.random.default_rng(seed=entropy)
+        self.instance = GowallaSIEpidemic(edge_cost_generator=lambda: 0., mu=1., zeta=1., generator=generator)
+        self.instance._create_gowalla_vertices()
 
     def test_position_calculation_basic(self):
         check_ins = [
@@ -56,7 +58,7 @@ class VertexTests(unittest.TestCase):
             CheckIn(user_id=23, time=datetime.datetime.now(), latitude=4., longitude=5., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((4., 5.), GowallaSIEpidemic._get_user_position(check_ins, self.generator))
+            self.assertEqual((4., 5.), self.instance._get_user_position(check_ins))
 
     def test_position_calculation_rounding_close(self):
         # Will return (6, 7) at least half the time if any of the points near (3, 50) don't round correctly to (3, 50).
@@ -71,7 +73,7 @@ class VertexTests(unittest.TestCase):
             CheckIn(user_id=10, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((3., 50.), GowallaSIEpidemic._get_user_position(check_ins, self.generator))
+            self.assertEqual((3., 50.), self.instance._get_user_position(check_ins))
 
     def test_position_calculation_rounding_far(self):
         # Will return (10.25, 27) at least half the time if any of the points near (10.25, 27) round incorrectly to
@@ -88,7 +90,7 @@ class VertexTests(unittest.TestCase):
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((6., 7.), GowallaSIEpidemic._get_user_position(check_ins, self.generator))
+            self.assertEqual((6., 7.), self.instance._get_user_position(check_ins))
 
     def test_position_calcuation_ties(self):
         # Should return (53, 27) half the time and (69, 11) the rest of the time.
@@ -102,7 +104,7 @@ class VertexTests(unittest.TestCase):
 
         location_counts = {0: 0, 1: 0, 2: 0}
         for i in range(100000):
-            location = GowallaSIEpidemic._get_user_position(check_ins, self.generator)
+            location = self.instance._get_user_position(check_ins)
             if location == (53., 27.):
                 location_counts[0] += 1
             elif location == (69., 11.):
@@ -117,6 +119,11 @@ class VertexTests(unittest.TestCase):
 
         p_value = dkw_p_value(sample_data=location_counts, pmf=target_pmf, tvd_bound=0.01)
         self.assertEqual(7.254142213666701e-05, p_value)
+
+
+class GraphTests(unittest.TestCase):
+    def test_specific_vertex(self):
+        pass
 
 
 if __name__ == '__main__':
