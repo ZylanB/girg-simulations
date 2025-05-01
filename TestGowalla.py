@@ -1,5 +1,7 @@
 import unittest
 import datetime
+
+import graph_tool.topology
 import numpy as np
 from Gowalla import *
 
@@ -25,7 +27,7 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(id_1, 4466)
 
 
-@unittest.skip("Let's not hammer the SNAP server unless we really want to test downloading specifically.")
+# @unittest.skip("Let's not hammer the SNAP server unless we really want to test downloading specifically.")
 class DownloadTests(unittest.TestCase):
     def test_download(self):
         """Deletes the data, then attempts to re-download it. Asserts the resulting files exist and have non-zero
@@ -44,12 +46,13 @@ class DownloadTests(unittest.TestCase):
         self.assertGreater(GowallaDataReader._EDGE_DATA_PATH.stat().st_size, 0)
 
 
-class VertexPositionTests(unittest.TestCase):
+class GenerationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         entropy = 89654657203871215244168134687054070552
         generator = np.random.default_rng(seed=entropy)
-        cls.instance = GowallaDataReader(generator=generator)
+        cls.instance = GowallaDataReader(generator=generator, vertex_path=GowallaSIEpidemic._SAVED_VERTEX_PATH,
+                                         edge_path=GowallaSIEpidemic._SAVED_EDGE_PATH)
 
     def test_position_calculation_basic(self):
         check_ins = [
@@ -122,10 +125,85 @@ class VertexPositionTests(unittest.TestCase):
         p_value = dkw_p_value(sample_data=location_counts, pmf=target_pmf, tvd_bound=0.01)
         self.assertEqual(6.137472530978548e-09, p_value)
 
+    def test_save_load(self):
+        self.instance.save_files()
+        test_epidemic = GowallaSIEpidemic(edge_cost_generator=lambda: 0, mu=1., zeta=2.)
+
+        original_vertices = self.instance.vertices
+        loaded_vertices = test_epidemic.vertex_set
+
+        self.assertEqual(original_vertices.ids, loaded_vertices.ids)
+        for id_ in original_vertices.ids:
+            self.assertEqual(original_vertices.id_to_position(id_), loaded_vertices.id_to_position(id_))
+            self.assertEqual(original_vertices.id_to_name(id_), loaded_vertices.id_to_name(id_))
+            self.assertEqual(original_vertices.weight(id_), loaded_vertices.weight(id_))
+
+        self.assertEqual(loaded_vertices.mu, 1.)
+        self.assertEqual(loaded_vertices.zeta, 2.)
+
+        original_edges = self.instance.edge_list
+        original_edge_pairs = {(x[0], x[1]) for x in original_edges}
+        loaded_edges = test_epidemic.graph.edges()
+        loaded_edge_pairs = {(e.source(), e.target()) for e in loaded_edges}
+        self.assertEqual(original_edge_pairs, loaded_edge_pairs)
+
 
 class GraphTests(unittest.TestCase):
-    def test_specific_vertex(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
+        test_epidemic = GowallaSIEpidemic(edge_cost_generator=lambda: 0, mu=1., zeta=2.)
+        cls.vertex_set = test_epidemic.vertex_set
+        cls.graph = test_epidemic.graph
+
+    def test_parameters(self):
+        self.assertEqual(self.graph.num_vertices(), 107092)
+        self.assertEqual(self.graph.num_edges(), 456830)
+
+        # Component sizes - note the presence of an obvious giant.
+        comp, hist = graph_tool.topology.label_components(self.graph)
+        sizes = sorted(int(size) for size in hist)
+        self.assertEqual(len(sizes), 8577)
+        self.assertEqual(sizes[0], 1)
+        self.assertEqual(sizes[-2], 13)
+        self.assertEqual(sizes[-1], 96953)
+
+    def test_edge_directionality(self):
+        self.assertFalse(self.graph.is_directed())
+
+    def test_position_uniqueness(self):
+        # This is kind of a lot of vertex pairs with equal positions, but I've double-checked against the data and
+        # it's real. This is because the Gowalla dataset is already discretised a little bit, it's just not obvious
+        # because they're using a very fine resolution plus maybe a fancier grid from a dedicated library (taking
+        # spherical geometry into account). The easy way to tell this is to notice that a lot of users have multiple
+        # check-ins from *exactly* the same location, which would be functionally impossible due to measurement error
+        # if the dataset weren't discretised.
+        self.assertGreater(self.vertex_set.size - len(self.vertex_set.positions), 15000)
+        self.assertLess(self.vertex_set.size - len(self.vertex_set.positions), 20000)
+
+    def test_specific_position(self):
+        user_id = 21
+        vertex_position = self.vertex_set.name_to_position(user_id)
+
+        # This user has one clearly anomalous position at (40.73, -73.9891), then a large number clustered around
+        # (33.66, -117.76) - we could plausibly end up with any of these depending on how we discretise.
+        self.assertGreater(vertex_position[0], 33.5)
+        self.assertLess(vertex_position[0], 34.2)
+        self.assertGreater(vertex_position[1], -118.2)
+        self.assertLess(vertex_position[1], -117.75)
+
+    def test_specific_neighbourhood(self):
+        user_id = 19
+        vertex_id = self.vertex_set.name_to_id(user_id)
+
+        # This user is joined to these user IDs, all of which are included in the graph.
+        neighbour_user_ids = {0, 97, 133, 135, 138, 335, 382, 436, 521, 566, 3002, 4609, 4610, 4611, 4612, 4613, 4614,
+                              4615, 4616, 4617, 4618, 4619, 4620}
+        neighbour_vertex_ids = {self.vertex_set.name_to_id(x) for x in neighbour_user_ids}
+        self.assertEqual(set(self.graph.get_all_neighbours(vertex_id)), neighbour_vertex_ids)
+
+    def test_specific_exclusion(self):
+        # This user has no location information available and shouldn't be included in the graph.
+        self.assertNotIn(196579, self.vertex_set.names)
 
 
 if __name__ == '__main__':
