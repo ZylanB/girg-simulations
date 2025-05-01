@@ -1,7 +1,7 @@
 import unittest
 import datetime
 import numpy as np
-from Gowalla import CheckIn, GowallaSIEpidemic
+from Gowalla import *
 
 from TestDistribution import dkw_p_value
 
@@ -20,7 +20,7 @@ class ParsingTests(unittest.TestCase):
 
     def test_edges(self):
         test_line = "3542\t4466\n".encode("utf-8")
-        id_0, id_1 = GowallaSIEpidemic._parse_edge_line(test_line)
+        id_0, id_1 = GowallaDataReader._parse_edge_line(test_line)
         self.assertEqual(id_0, 3542)
         self.assertEqual(id_1, 4466)
 
@@ -30,26 +30,26 @@ class DownloadTests(unittest.TestCase):
     def test_download(self):
         """Deletes the data, then attempts to re-download it. Asserts the resulting files exist and have non-zero
         size."""
-        GowallaSIEpidemic._VERTEX_DATA_PATH.unlink(missing_ok=True)
-        GowallaSIEpidemic._EDGE_DATA_PATH.unlink(missing_ok=True)
+        GowallaDataReader._VERTEX_DATA_PATH.unlink(missing_ok=True)
+        GowallaDataReader._EDGE_DATA_PATH.unlink(missing_ok=True)
 
-        self.assertFalse(GowallaSIEpidemic._VERTEX_DATA_PATH.exists())
-        self.assertFalse(GowallaSIEpidemic._EDGE_DATA_PATH.exists())
+        self.assertFalse(GowallaDataReader._VERTEX_DATA_PATH.exists())
+        self.assertFalse(GowallaDataReader._EDGE_DATA_PATH.exists())
 
-        GowallaSIEpidemic._obtain_snap_data()
+        GowallaDataReader._obtain_snap_data()
 
-        self.assertTrue(GowallaSIEpidemic._VERTEX_DATA_PATH.exists())
-        self.assertGreater(GowallaSIEpidemic._VERTEX_DATA_PATH.stat().st_size, 0)
-        self.assertTrue(GowallaSIEpidemic._EDGE_DATA_PATH.exists())
-        self.assertGreater(GowallaSIEpidemic._EDGE_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaDataReader._VERTEX_DATA_PATH.exists())
+        self.assertGreater(GowallaDataReader._VERTEX_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaDataReader._EDGE_DATA_PATH.exists())
+        self.assertGreater(GowallaDataReader._EDGE_DATA_PATH.stat().st_size, 0)
 
 
 class VertexPositionTests(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         entropy = 89654657203871215244168134687054070552
         generator = np.random.default_rng(seed=entropy)
-        self.instance = GowallaSIEpidemic(edge_cost_generator=lambda: 0., mu=1., zeta=1., generator=generator)
-        self.instance._create_gowalla_vertices()
+        cls.instance = GowallaDataReader(generator=generator)
 
     def test_position_calculation_basic(self):
         check_ins = [
@@ -58,7 +58,7 @@ class VertexPositionTests(unittest.TestCase):
             CheckIn(user_id=23, time=datetime.datetime.now(), latitude=4., longitude=5., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((4., 5.), self.instance._get_user_position(check_ins))
+            self.assertEqual((4., 5.), self.instance._get_user_position(check_ins)[0])
 
     def test_position_calculation_rounding_close(self):
         # Will return (6, 7) at least half the time if any of the points near (3, 50) don't round correctly to (3, 50).
@@ -73,7 +73,7 @@ class VertexPositionTests(unittest.TestCase):
             CheckIn(user_id=10, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((3., 50.), self.instance._get_user_position(check_ins))
+            self.assertEqual((3., 50.), self.instance._get_user_position(check_ins)[0])
 
     def test_position_calculation_rounding_far(self):
         # Will return (10.25, 27) at least half the time if any of the points near (10.25, 27) round incorrectly to
@@ -90,7 +90,7 @@ class VertexPositionTests(unittest.TestCase):
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=6., longitude=7., location_id=0)
         ]
         for i in range(50):
-            self.assertEqual((6., 7.), self.instance._get_user_position(check_ins))
+            self.assertEqual((6., 7.), self.instance._get_user_position(check_ins)[0])
 
     def test_position_calcuation_ties(self):
         # Should return (53, 27) half the time and (69, 11) the rest of the time.
@@ -104,7 +104,7 @@ class VertexPositionTests(unittest.TestCase):
 
         location_counts = {0: 0, 1: 0, 2: 0}
         for i in range(100000):
-            location = self.instance._get_user_position(check_ins)
+            location = self.instance._get_user_position(check_ins)[0]
             if location == (53., 27.):
                 location_counts[0] += 1
             elif location == (69., 11.):
@@ -118,7 +118,7 @@ class VertexPositionTests(unittest.TestCase):
             return 0.
 
         p_value = dkw_p_value(sample_data=location_counts, pmf=target_pmf, tvd_bound=0.01)
-        self.assertEqual(7.254142213666701e-05, p_value)
+        self.assertEqual(0.00010194951487247018, p_value)
 
 
 class GraphTests(unittest.TestCase):
