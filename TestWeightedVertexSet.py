@@ -50,13 +50,13 @@ class BasicTests(unittest.TestCase):
         entropy = 331375102187953107209086426124205679010
         generator = np.random.default_rng(seed=entropy)
 
-        def weight_generator(vertices: VertexSet) -> Dict[Any, float]:
-            return {id_: generator.random() for id_ in vertices.names}
+        def weight_generator(vertices: VertexSet) -> List[float]:
+            return [generator.random() for _ in vertices.names]
 
         data = WeightedVertexSet(self.vertices, weight_generator)
-        first_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
+        first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
         data.resample_weights()
-        second_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
+        second_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
 
         self.assertEqual(first_sample.keys(), second_sample.keys())
         for id_ in first_sample.keys():
