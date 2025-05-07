@@ -3,6 +3,7 @@ import math
 from collections import defaultdict
 from TestDistribution import dkw_p_value
 from scipy.stats import binom
+from pathlib import Path
 
 from SIEpidemic import *
 from WeightedVertexSet import fixed_weights_generator, WeightedVertexSet, power_law_generator
@@ -341,8 +342,8 @@ class FileIOTests(unittest.TestCase):
                                  mu=1., zeta=0.5)
         saved_value.run_infection(np.random.randint(10000))
 
-        saved_value.save_to_file(".", "test_graph")
-        loaded_value = SIEpidemic.load_from_file(".", "test_graph")
+        saved_value.save_to_file(Path.cwd(), "test_graph")
+        loaded_value = SIEpidemic.load_from_file(Path.cwd(), "test_graph")
 
         saved_vertices = saved_value.vertex_set
         loaded_vertices = loaded_value.vertex_set

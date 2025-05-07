@@ -6,7 +6,7 @@ import numpy as np
 import graph_tool as gt
 from graph_tool.topology import shortest_distance
 import girg_sampling.girgs as gs
-import os.path
+from pathlib import Path
 
 from WeightedVertexSet import WeightedVertexSet, fixed_weights_generator
 from typing import Any, Callable, List, Optional, Tuple
@@ -142,15 +142,15 @@ class SIEpidemic:
 
         return len(self.infection_path(vertex_id)) - 1
 
-    def save_to_file(self, folder: str, name: str):
+    def save_to_file(self, folder: Path, name: str):
         """Logs all data in the current epidemic to the given file in pickle format. The epidemic will be saved in two
         files, one name.gt file and one name.pickle file."""
-        with open(os.path.join(folder, name + ".pickle"), "wb") as file:
+        with open(folder / f"{name}.pickle", "wb") as file:
             dill.dump(self.vertex_set, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.edge_generator, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.edge_cost_generator, file, protocol=dill.HIGHEST_PROTOCOL)
 
-        self.graph.save(os.path.join(folder, name + ".gt"))
+        self.graph.save(str(folder / f"{name}.gt"))
 
     @staticmethod
     def _empty_epidemic() -> SIEpidemic:
@@ -164,14 +164,14 @@ class SIEpidemic:
                           zeta=0.)
 
     @staticmethod
-    def load_from_file(folder: str, name: str) -> SIEpidemic:
+    def load_from_file(folder: Path, name: str) -> SIEpidemic:
         """Loads an SIEpidemic saved via the save_to_file method as name.gt and name.pickle and returns the resulting
         object."""
-        with open(os.path.join(folder, name + ".pickle"), "rb") as file:
+        with open(folder / f"{name}.pickle", "rb") as file:
             vertices = dill.load(file)
             edge_gen = dill.load(file)
             cost_gen = dill.load(file)
-            graph = gt.load_graph(os.path.join(folder, name + ".gt"))
+            graph = gt.load_graph(str(folder / f"{name}.gt"))
 
             return_value = SIEpidemic._empty_epidemic()
             return_value.vertex_set = vertices
