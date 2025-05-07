@@ -5,17 +5,13 @@ import numpy as np
 
 
 class WeightedVertexSet:
-    def __init__(self, vertices: VertexSet, weight_generator: Callable[[VertexSet], List[float]], mu: float,
-                 zeta: float):
+    def __init__(self, vertices: VertexSet, weight_generator: Callable[[VertexSet], List[float]]):
         """Stores a vertex set for a GIRG with both spatial and weight data. Vertices should be the underlying vertex
         set. Weight_generator should be a function that (probably randomly) resamples weights for the given
-        VertexSet, returning a dictionary from vertex IDs to weights. Mu should be the weight penalty,
-        and zeta should be the spatial penalty."""
+        VertexSet, returning a dictionary from vertex IDs to weights."""
         self.vertices = vertices
         self.weight_generator = weight_generator
         self.weights = None
-        self.mu = mu
-        self.zeta = zeta
         self.resample_weights()
 
     def __getattr__(self, item):
@@ -31,10 +27,10 @@ class WeightedVertexSet:
         """Resamples the vertex weights from the given generator function."""
         self.weights = self.weight_generator(self.vertices)
 
-    def penalty(self, x_id: int, y_id: int) -> float:
+    def penalty(self, x_id: int, y_id: int, mu: float, zeta: float) -> float:
         """Returns the total penalty for a possible edge (specified by vertex IDs), not including the random cost."""
-        spatial_penalty = self.vertices.distance(x_id, y_id) ** self.zeta
-        weight_penalty = (self.weight(x_id) * self.weight(y_id)) ** self.mu
+        spatial_penalty = self.vertices.distance(x_id, y_id) ** zeta
+        weight_penalty = (self.weight(x_id) * self.weight(y_id)) ** mu
         return spatial_penalty * weight_penalty
 
 

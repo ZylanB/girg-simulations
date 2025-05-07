@@ -15,13 +15,16 @@ from VertexSet import lattice
 
 class SIEpidemic:
     """Stores a spatial graph whose edge weights determine the spread of an SI model epidemic. Edge_cost_generator
-    should return a sample of the *random* part of an edge's cost, i.e. not including degree or spatial penalties (
-    which are calculated in WeightedVertexSet)."""
+    should return a sample of the *random* part of an edge's cost, i.e. not including degree or spatial penalties
+    (which are calculated in WeightedVertexSet). Mu should be the weight penalty, and zeta should be the spatial
+    penalty."""
     def __init__(self, vertex_set: WeightedVertexSet, edge_cost_generator: Callable[[], float],
-                 edge_generator: Callable[[WeightedVertexSet], List[Tuple[int, int]]]):
+                 edge_generator: Callable[[WeightedVertexSet], List[Tuple[int, int]]], mu: float, zeta: float):
         self.vertex_set = vertex_set
         self.edge_cost_generator = edge_cost_generator
         self.edge_generator = edge_generator
+        self.mu = mu
+        self.zeta = zeta
 
         self.graph = gt.Graph(directed=False)
         self.graph.add_vertex(n=self.vertex_set.size)
@@ -52,7 +55,7 @@ class SIEpidemic:
         for edge in self.graph.edges():
             u_id = self.graph.vertex_index[edge.source()]
             v_id = self.graph.vertex_index[edge.target()]
-            new_cost = self.edge_cost_generator() * self.vertex_set.penalty(u_id, v_id)
+            new_cost = self.edge_cost_generator() * self.vertex_set.penalty(u_id, v_id, mu=self.mu, zeta=self.zeta)
             self.edge_costs[edge] = new_cost
 
     def run_infection(self, initial_vertex_id: int):
@@ -154,10 +157,11 @@ class SIEpidemic:
         """Creates an empty SIEpidemic object which can be initialised manually. Used when loading from files."""
         unweighted_vertices = lattice(size=1, dimension=1)
         weight_gen = fixed_weights_generator(weights={0: 1})
-        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen, mu=1., zeta=1.)
+        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
         edge_gen = fixed_graph_generator([])
         cost_gen = lambda: 0
-        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen)
+        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen, mu=0.,
+                          zeta=0.)
 
     @staticmethod
     def load_from_file(folder: str, name: str) -> SIEpidemic:

@@ -29,7 +29,7 @@ class BasicTests(unittest.TestCase):
     def test_weighted_vertex_data(self):
         mu = 2.
         zeta = 3.
-        data = WeightedVertexSet(self.vertices, self.generator, mu=mu, zeta=zeta)
+        data = WeightedVertexSet(self.vertices, self.generator)
 
         self.assertEqual(self.weights[1], data.weight(self.id_1))
         self.assertEqual(self.weights[2], data.weight(self.id_2))
@@ -40,9 +40,10 @@ class BasicTests(unittest.TestCase):
         self.assertEqual(self.weights[2], data.weight(self.id_2))
         self.assertEqual(self.weights["abc"], data.weight(self.id_abc))
 
-        self.assertEqual(2.5 ** mu * 2 ** zeta, data.penalty(self.id_1, self.id_2))
-        self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(self.id_2, self.id_abc))
-        self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(self.id_1, self.id_abc), delta=1e-13)
+        self.assertEqual(2.5 ** mu * 2 ** zeta, data.penalty(self.id_1, self.id_2, mu=mu, zeta=zeta))
+        self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(self.id_2, self.id_abc, mu=mu, zeta=zeta))
+        self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(self.id_1, self.id_abc, mu=mu, zeta=zeta),
+                               delta=1e-13)
 
     def test_resample(self):
         """Checks that resample_weights is actually resampling every vertex weight."""
@@ -52,7 +53,7 @@ class BasicTests(unittest.TestCase):
         def weight_generator(vertices: VertexSet) -> Dict[Any, float]:
             return {id_: generator.random() for id_ in vertices.names}
 
-        data = WeightedVertexSet(self.vertices, weight_generator, mu=0., zeta=0.)
+        data = WeightedVertexSet(self.vertices, weight_generator)
         first_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
         data.resample_weights()
         second_sample = {id_: data.weights[id_] for id_ in self.vertices.names}
@@ -97,7 +98,7 @@ class TestPowerLaw(unittest.TestCase):
         n = 100000
         vertices = VertexSet(dimension=1, metric=euclidean_distance_function(d=1))
         vertices.set_points([(i,) for i in range(n)])
-        test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator, mu=0.0, zeta=0.0)
+        test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator)
 
         weight_counts = defaultdict(lambda: 0)
         for i in vertices.names:
