@@ -1,5 +1,5 @@
 from TestDistribution import dkw_p_value
-from scipy.stats import poisson
+from scipy.stats import poisson  # type: ignore
 import unittest
 from VertexSet import *
 from collections import defaultdict
@@ -8,7 +8,7 @@ from collections import defaultdict
 class TestVertexSet(unittest.TestCase):
     @classmethod
     def setUp(cls):
-        metric = (lambda x, y: 0.0 if x == y else 1.0)  # Unit metric
+        metric = GenericMetric(_function=lambda x, y: 0.0 if x == y else 1.0, description="Unit metric")
         cls.test_instance = VertexSet(dimension=2, metric=metric)
 
     def test_properties(self):
@@ -145,11 +145,11 @@ class TestEarthDistance(unittest.TestCase):
     def test_simple(self):
         bristol = (51.4545, -2.5879)
         delft = (52.0116, 4.3571)
-        self.assertEqual(earth_distance(bristol, delft), 482.07966758305776)
+        self.assertEqual(EarthDistance()(bristol, delft), 482.07966758305776)
 
         london = (51.6072, -0.1276)
         new_york = (40.7128, -74.0060)
-        self.assertEqual(earth_distance(london, new_york), 5566.760358601733)
+        self.assertEqual(EarthDistance()(london, new_york), 5566.760358601733)
 
 
 class TestPPP(unittest.TestCase):

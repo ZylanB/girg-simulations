@@ -1,7 +1,7 @@
 import unittest
 from TestDistribution import dkw_p_value
 from WeightedVertexSet import *
-from VertexSet import VertexSet, euclidean_distance_function
+from VertexSet import VertexSet, EuclideanDistance
 from collections import defaultdict
 from math import floor
 
@@ -9,9 +9,9 @@ from math import floor
 class BasicTests(unittest.TestCase):
     def setUp(self):
         self.weights = {1: 1., 2: 2.5, "abc": 3.}
-        self.generator = fixed_weights_generator(self.weights)
+        self.generator = FixedWeightGenerator(self.weights, "Test generator")
 
-        self.vertices = VertexSet(dimension=2, metric=euclidean_distance_function(d=2))
+        self.vertices = VertexSet(dimension=2, metric=EuclideanDistance(d=2))
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
         self.vertices.set_points_from_names(points)
 
@@ -50,8 +50,9 @@ class BasicTests(unittest.TestCase):
         entropy = 331375102187953107209086426124205679010
         generator = np.random.default_rng(seed=entropy)
 
-        def weight_generator(vertices: VertexSet) -> List[float]:
+        def weight_generator_fn(vertices: VertexSet) -> List[float]:
             return [generator.random() for _ in vertices.names]
+        weight_generator = GenericWeightGenerator(_function=weight_generator_fn, description="Test weight generator")
 
         data = WeightedVertexSet(self.vertices, weight_generator)
         first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
@@ -66,9 +67,9 @@ class BasicTests(unittest.TestCase):
 class TestFromDegrees(unittest.TestCase):
     def test_from_degrees(self):
         degrees = {1: 40, 2: 20, "abc": 60, "def": 0}  # Average degree 30, penalty should be 20.
-        generator = from_degrees_generator(degrees)
+        generator = create_from_degrees_generator(degrees, "Test generator")
 
-        vertices = VertexSet(dimension=2, metric=euclidean_distance_function(d=2))
+        vertices = VertexSet(dimension=2, metric=EuclideanDistance(d=2))
         points = {1: (0, 0), 2: (1, 1), "abc": (2, 2), "def": (3, 3)}
         vertices.set_points_from_names(points)
         output = generator(vertices)
@@ -91,12 +92,12 @@ class TestPowerLaw(unittest.TestCase):
         entropy = 127743512994918990291592040963354975738  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
 
-        scaling = lambda w: 2*w
+        scaling = GenericEdgeWeightScaler(_function=lambda w: 2*w, description="Test scaler")
         tau = 2.5
-        weight_generator = power_law_generator(tau=tau, ell=scaling, generator=generator)
+        weight_generator = PowerLawWeightGenerator(tau=tau, ell=scaling, generator=generator)
 
         n = 100000
-        vertices = VertexSet(dimension=1, metric=euclidean_distance_function(d=1))
+        vertices = VertexSet(dimension=1, metric=EuclideanDistance(d=1))
         vertices.set_points([(i,) for i in range(n)])
         test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator)
 

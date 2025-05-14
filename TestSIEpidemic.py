@@ -2,12 +2,11 @@ import unittest
 import math
 from collections import defaultdict
 from TestDistribution import dkw_p_value
-from scipy.stats import binom
-from pathlib import Path
+from scipy.stats import binom  # type: ignore
 
 from SIEpidemic import *
-from WeightedVertexSet import fixed_weights_generator, WeightedVertexSet, power_law_generator
-from VertexSet import VertexSet, euclidean_distance_function, lattice
+from WeightedVertexSet import FixedWeightGenerator, WeightedVertexSet, PowerLawWeightGenerator, IdentityWeightScaler
+from VertexSet import VertexSet, EuclideanDistance, lattice
 
 
 class BasicTests(unittest.TestCase):
@@ -19,7 +18,7 @@ class BasicTests(unittest.TestCase):
         self.mu = 2.0
         self.zeta = 10.0
 
-        unweighted_vertices = VertexSet(dimension=self.d, metric=euclidean_distance_function(d=self.d))
+        unweighted_vertices = VertexSet(dimension=self.d, metric=EuclideanDistance(d=self.d))
         unweighted_vertices.set_points_from_names({"a": (0, 1), "b": (1, 1), "c": (1, 0), "d": (0, 0), "e": (0, 3),
                                                    "f": (-1, -1)})
         self.a_id = unweighted_vertices.name_to_id("a")
@@ -30,18 +29,18 @@ class BasicTests(unittest.TestCase):
         self.f_id = unweighted_vertices.name_to_id("f")
 
         self.weights = {"a": 2., "b": 3., "c": 5., "d": 7., "e": 11., "f": 13.}
-        weight_generator = fixed_weights_generator(weights=self.weights)
+        weight_generator = FixedWeightGenerator(weights=self.weights, description="Test weights")
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
         self.edges = [(self.a_id, self.b_id), (self.b_id, self.c_id), (self.c_id, self.d_id), (self.d_id, self.a_id),
                       (self.a_id, self.c_id), (self.a_id, self.e_id)]
-        edge_generator = fixed_graph_generator(edges=self.edges)
+        edge_generator = FixedGraphGenerator(edges=self.edges, description="Test graph")
 
         self.unpenalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator,
-                                               edge_cost_generator=constant_generator(1.), mu=0., zeta=0.)
+                                               edge_cost_generator=ConstantCostGenerator(1.), mu=0., zeta=0.)
         self.unpenalised_epidemic.run_infection(self.a_id)
 
         self.penalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator,
-                                             edge_cost_generator=constant_generator(1.), mu=self.mu, zeta=self.zeta)
+                                             edge_cost_generator=ConstantCostGenerator(1.), mu=self.mu, zeta=self.zeta)
         self.penalised_epidemic.run_infection(self.a_id)
 
     def test_unpenalised_properties(self):
@@ -141,11 +140,11 @@ class BasicTests(unittest.TestCase):
 
 class EdgeCostTests(unittest.TestCase):
     def test_constant_cost(self):
-        generator = constant_generator(1.)
+        generator = ConstantCostGenerator(1.)
         for _ in range(10):
             self.assertEqual(generator(), 1.0)
 
-        generator = constant_generator(1.5)
+        generator = ConstantCostGenerator(1.5)
         for _ in range(10):
             self.assertEqual(generator(), 1.5)
 
@@ -153,10 +152,10 @@ class EdgeCostTests(unittest.TestCase):
         entropy = 252869566619441809084118758734182862550  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
         lambda_ = 1
-        cost_generator = fpp_generator(lambda_, generator=generator)
+        cost_generator = FPPCostGenerator(lambda_=lambda_, generator=generator)
 
         n = 100000
-        costs = [cost_generator() for i in range(n)]
+        costs = [cost_generator() for _ in range(n)]
 
         # Split into buckets
         bucket_width = 0.3
@@ -196,11 +195,11 @@ class GIRGTests(unittest.TestCase):
         id_d = unweighted_vertices.position_to_id((3.,))
 
         weights = {id_a: 1.1, id_b: 1.2, id_c: 1.3, id_d: 1.4}
-        weight_gen = fixed_weights_generator(weights)
+        weight_gen = FixedWeightGenerator(weights, description="Test weights")
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
 
-        graph_gen = girg_generator(alpha=self.alpha, scale_factor=.25, generator=generator)
-        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=constant_generator(0.),
+        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=.25, generator=generator)
+        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
                               edge_generator=graph_gen, mu=0., zeta=0.)
 
         vertex_a = epidemic.graph.vertex(id_a)
@@ -265,11 +264,11 @@ class GIRGTests(unittest.TestCase):
         id_i = unweighted_vertices.position_to_id((2., 2.))
 
         weights = {id_a: 1., id_b: 1., id_c: 1., id_d: 1., id_e: 1., id_f: 1., id_g: 1., id_h: 1., id_i: 1.}
-        weight_gen = fixed_weights_generator(weights)
+        weight_gen = FixedWeightGenerator(weights, description="Test weights")
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
 
-        graph_gen = girg_generator(alpha=self.alpha, scale_factor=1/3, generator=generator)
-        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=constant_generator(0.),
+        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=1/3, generator=generator)
+        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
                               edge_generator=graph_gen, mu=0., zeta=0.)
 
         vertex_a = epidemic.graph.vertex(id_a)
@@ -334,10 +333,10 @@ class FileIOTests(unittest.TestCase):
     def helper(self, generator: np.random.Generator):
         """Run a quick infection on 10k vertices, save it, load it, and check the two runs are equal."""
         unweighted_vertices = lattice(dimension=2, size=100)
-        weight_gen = power_law_generator(tau=3, generator=generator)
+        weight_gen = PowerLawWeightGenerator(tau=3, generator=generator, ell=IdentityWeightScaler())
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
-        cost_gen = fpp_generator(lambda_=1.)
-        edge_gen = girg_generator(alpha=1.8, scale_factor=1/100)
+        cost_gen = FPPCostGenerator(lambda_=1.)
+        edge_gen = GirgGenerator(alpha=1.8, scale_factor=1/100)
         saved_value = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen,
                                  mu=1., zeta=0.5)
         saved_value.run_infection(np.random.randint(10000))

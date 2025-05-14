@@ -1,10 +1,23 @@
 from math import pow
-import haversine
+import haversine  # type: ignore
 import functools
 import itertools
 import numpy as np
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
+from LoggableFunction import LoggableFunction
+
+
+class Metric(LoggableFunction[[Tuple[float, ...], Tuple[float, ...]], float]):
+    """Distance function between two positions in a VertexSet. Should be symmetric."""
+    pass
+
+
+class GenericMetric(Metric):
+    """Lightweight option to just pass in the function you care about with a description for logging."""
+    def __init__(self, _function, description: str):
+        self.description = description
+        self._function = _function
 
 
 @dataclass(slots=True)
@@ -18,7 +31,7 @@ class VertexData:
 
 
 class VertexSet:
-    def __init__(self, dimension: int, metric: Callable[[Tuple[float, ...], Tuple[float, ...]], float]):
+    def __init__(self, dimension: int, metric: Metric):
         """Stores a vertex set for a GIRG with spatial data and provides some spatial utility functions. Usage:
         Construct with VertexSet(dimension, distance), then set the actual vertices using either setPointsFromIds or
         setPoints."""
@@ -28,9 +41,9 @@ class VertexSet:
         # Points in the vertex set. Note we don't store these as NumPy arrays as iterating over these or reading
         # individual values is super-slow. We'll store a NumPy array separately for when it's useful and use the
         # position_to_id map to go from the raw positions stored in the NumPy array to the IDs stored here.
-        self._vertex_id_dict = {}
-        self._vertex_position_dict = {}
-        self._vertex_name_dict = {}
+        self._vertex_id_dict: Dict[int, VertexData] = {}
+        self._vertex_position_dict: Dict[Tuple[float, ...], VertexData] = {}
+        self._vertex_name_dict: Dict[Any, VertexData] = {}
 
     def name_to_data(self, name: str) -> VertexData:
         return self._vertex_name_dict[name]
@@ -113,41 +126,76 @@ class VertexSet:
         return self.get_ids_in_annulus(center=center, inner_radius=0, outer_radius=radius)
 
 
-def euclidean_distance(x: Tuple[float, ...], y: Tuple[float, ...], d: int) -> float:
+class EuclideanDistance(Metric):
     """Returns the distance between x and y in a Euclidean space of dimension d."""
-    return pow(sum((x[i] - y[i])**d for i in range(len(x))), 1/d)
+    def __init__(self, d: int):
+        self.d = d
+        self._function = functools.partial(self._euclidean_distance, d=d)
+
+    @staticmethod
+    def _euclidean_distance(x: Tuple[float, ...], y: Tuple[float, ...], d: int) -> float:
+        return pow(sum((x[i] - y[i]) ** d for i in range(len(x))), 1 / d)
 
 
-def euclidean_distance_function(d: int) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
-    """Returns the distance *function* for a Euclidean space of dimension d, i.e. currying d into euclideanDistance."""
-    return functools.partial(euclidean_distance, d=d)
+class TorusDistance(Metric):
+    def __init__(self, d: int, size: float):
+        """Returns the distance between x and y on [0,size]^d considered as a torus."""
+        self.d = d
+        self.size = size
+        self._function = functools.partial(self._torus_distance, d=d, size=size)
+
+    @staticmethod
+    def _torus_distance(x: Tuple[float, ...], y: Tuple[float, ...], size: float, d: int) -> float:
+        l1_distances = [0.] * d
+        for i in range(d):
+            interval_distance = abs(x[i] - y[i])
+            l1_distances[i] = interval_distance if interval_distance <= size / 2 else size - interval_distance
+
+        return pow(sum(x ** d for x in l1_distances), 1 / d)
 
 
-def torus_distance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> float:
-    """Returns the distance between x and y on [0,size]^d considered as a torus."""
-    l1_distances = [0]*d
-    for i in range(d):
-        interval_distance = abs(x[i] - y[i])
-        l1_distances[i] = interval_distance if interval_distance <= size/2 else size - interval_distance
-
-    return pow(sum(x**d for x in l1_distances), 1/d)
-
-
-def torus_distance_function(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
-    """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
-    return functools.partial(torus_distance, d=d, size=size)
-
-
-def earth_distance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
+class EarthDistance(Metric):
     """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
-    (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
-    return haversine.haversine(x, y)
+        (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
+    def __init__(self):
+        self._function = lambda x, y: haversine.haversine(x, y)
+
+
+# def euclidean_distance(x: Tuple[float, ...], y: Tuple[float, ...], d: int) -> float:
+#     """Returns the distance between x and y in a Euclidean space of dimension d."""
+#     return pow(sum((x[i] - y[i])**d for i in range(len(x))), 1/d)
+#
+#
+# def euclidean_distance_function(d: int) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
+#     """Returns the distance *function* for a Euclidean space of dimension d, i.e. currying d into euclideanDistance."""
+#     return functools.partial(euclidean_distance, d=d)
+#
+#
+# def torus_distance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> float:
+#     """Returns the distance between x and y on [0,size]^d considered as a torus."""
+#     l1_distances = [0]*d
+#     for i in range(d):
+#         interval_distance = abs(x[i] - y[i])
+#         l1_distances[i] = interval_distance if interval_distance <= size/2 else size - interval_distance
+#
+#     return pow(sum(x**d for x in l1_distances), 1/d)
+#
+#
+# def torus_distance_function(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
+#     """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
+#     return functools.partial(torus_distance, d=d, size=size)
+#
+#
+# def earth_distance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
+#     """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
+#     (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
+#     return haversine.haversine(x, y)
 
 
 def lattice(dimension: int, size: int) -> VertexSet:
     """Returns a VertexSet for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
     # Curry the dimension into the distance
-    return_value = VertexSet(dimension=dimension, metric=torus_distance_function(d=dimension, size=size))
+    return_value = VertexSet(dimension=dimension, metric=TorusDistance(d=dimension, size=size))
 
     # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
     one_axis_points = [float(i) for i in range(0, size)]
@@ -170,6 +218,6 @@ def poisson_point_process(dimension: int, size: float, generator: Optional[np.ra
         next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
         points.append(next_point_coordinates)
 
-    return_value = VertexSet(dimension=dimension, metric=torus_distance_function(dimension, size))
+    return_value = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size))
     return_value.set_points(points)
     return return_value
