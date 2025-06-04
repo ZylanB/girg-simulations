@@ -98,7 +98,7 @@ class SIExperiment:
         self.results = []
         self._current_run = 0
 
-        self._log_settings()
+        self.save_settings()
 
         for i in range(self.run_count):
             # We don't bother resampling immediately before the first run, as we sampled once on class creation.
@@ -162,7 +162,7 @@ class SIExperiment:
         """Returns the filename used to log the SIExperiment's settings."""
         return f"{self.name}-settings.cfg"
 
-    def _log_settings(self) -> None:
+    def save_settings(self) -> None:
         """Saves the current settings in human-readable format."""
         if self.initial_vertex_fn is None:
             raise RuntimeError("Attempting to save a non-existent initial vertex function.")
