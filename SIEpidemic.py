@@ -16,7 +16,9 @@ from VertexSet import lattice
 
 class EdgeCostGenerator(LoggableFunction[[], float]):
     """Function to generate the random part of a single edge cost (the "L" per our notation)."""
-    pass
+    @property
+    def function_role(self):
+        return "Edge cost generator"
 
 
 class GenericEdgeCostGenerator(EdgeCostGenerator):
@@ -29,7 +31,9 @@ class GenericEdgeCostGenerator(EdgeCostGenerator):
 class EdgeGenerator(LoggableFunction[[WeightedVertexSet], List[Tuple[int, int]]]):
     """Function to generate the edges of our graph; these are stored in a tuple since sets aren't Hashable, but are
     nevertheless undirected."""
-    pass
+    @property
+    def function_role(self):
+        return "Edge set generator"
 
 
 class GenericEdgeGenerator(EdgeGenerator):

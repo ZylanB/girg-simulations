@@ -8,7 +8,9 @@ from LoggableFunction import LoggableFunction
 
 class WeightGenerator(LoggableFunction[[VertexSet], List[float]]):
     """Function to generate a list of weights for the given vertex set."""
-    pass
+    @property
+    def function_role(self):
+        return "Vertex weight generator"
 
 
 class GenericWeightGenerator(WeightGenerator):
@@ -51,7 +53,9 @@ class WeightedVertexSet:
 
 class EdgeWeightScaler(LoggableFunction[[float, Optional[np.random.Generator]], float]):
     """A (possibly random) function that can play the role of ell in a power law weight distribution."""
-    pass
+    @property
+    def function_role(self):
+        return "Edge weight scaler in power-law distribution"
 
 
 class IdentityWeightScaler(EdgeWeightScaler):

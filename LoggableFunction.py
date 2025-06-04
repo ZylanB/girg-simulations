@@ -14,9 +14,14 @@ class LoggableFunction(Generic[P, R]):
         return self._function(*args, **kwargs)
 
     @property
+    def function_role(self) -> str:
+        """Returns a string describing what the function is being used for, e.g. "Initial vertex selector"."""
+        raise NotImplementedError()
+
+    @property
     def log_lines(self) -> List[str]:
         """Returns a list of lines to log all public members of the function. Allows for nested LoggableFunctions."""
-        line_list = [f"Logged function of type {type(self)}:\n"]
+        line_list = [f"{self.function_role} of type {type(self)}:\n"]
 
         for attr, value in self.__dict__.items():
             # Ignore private members.

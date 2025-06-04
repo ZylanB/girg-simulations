@@ -8,7 +8,9 @@ from LoggableFunction import LoggableFunction
 
 class InitialVertexFunction(LoggableFunction[[np.random.Generator], int]):
     """Function to choose the initial vertex of each run of an experiment. Includes a name for logging."""
-    pass
+    @property
+    def function_role(self):
+        return "Initial vertex selector"
 
 
 class GenericInitialVertexFunction(InitialVertexFunction):
@@ -20,7 +22,9 @@ class GenericInitialVertexFunction(InitialVertexFunction):
 
 class ResultFunction(LoggableFunction[[SIEpidemic, np.random.Generator], Any]):
     """Function to pull out the results of each run of an experiment. Includes a name for logging."""
-    pass
+    @property
+    def function_role(self):
+        return "Test result extractor"
 
 
 class GenericResultFunction(ResultFunction):

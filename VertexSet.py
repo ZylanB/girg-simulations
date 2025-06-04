@@ -10,7 +10,9 @@ from LoggableFunction import LoggableFunction
 
 class Metric(LoggableFunction[[Tuple[float, ...], Tuple[float, ...]], float]):
     """Distance function between two positions in a VertexSet. Should be symmetric."""
-    pass
+    @property
+    def function_role(self):
+        return "Distance function on vertex set"
 
 
 class GenericMetric(Metric):
