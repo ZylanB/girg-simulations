@@ -6,7 +6,7 @@ import dill  # type: ignore
 from LoggableFunction import LoggableFunction
 
 
-class InitialVertexFunction(LoggableFunction[[], int]):
+class InitialVertexFunction(LoggableFunction[[np.random.Generator], int]):
     """Function to choose the initial vertex of each run of an experiment. Includes a name for logging."""
     pass
 
@@ -18,7 +18,7 @@ class GenericInitialVertexFunction(InitialVertexFunction):
         self.description = description
 
 
-class ResultFunction(LoggableFunction[[SIEpidemic], Any]):
+class ResultFunction(LoggableFunction[[SIEpidemic, np.random.Generator], Any]):
     """Function to pull out the results of each run of an experiment. Includes a name for logging."""
     pass
 
@@ -70,7 +70,7 @@ class SIExperiment:
         self.results: List[Any] = []
         self._current_run = 0
 
-    def _single_run(self) -> None:
+    def _single_run(self, resample_edges: bool) -> None:
         """Executes a single run of the experiment, resampling and/or logging the SIEpidemic if if necessary."""
         if self.epidemic is None:
             raise RuntimeError("Attempting to run experiment with an undefined epidemic.")
@@ -79,12 +79,12 @@ class SIExperiment:
         if self.result_fn is None:
             raise RuntimeError("Attempting to run experiment with an undefined epidemic.")
 
-        if self.resample_edges:
+        if resample_edges:
             self.epidemic.sample_edges()
         if self.resample_costs:
             self.epidemic.sample_edge_costs()
-        self.epidemic.run_infection(initial_vertex_id=self.initial_vertex_fn())
-        self.results.append(self.result_fn(self.epidemic))
+        self.epidemic.run_infection(initial_vertex_id=self.initial_vertex_fn(self.generator))
+        self.results.append(self.result_fn(self.epidemic.graph, self.generator))
         if self.full_log:
             self._log_run()
 
@@ -97,7 +97,8 @@ class SIExperiment:
         self._log_settings()
 
         for i in range(self.run_count):
-            self._single_run()
+            # We don't bother resampling immediately before the first run, as we sampled once on class creation.
+            self._single_run(resample_edges=self.resample_edges and i != 0)
             self._current_run += 1
         self._log_results()
 

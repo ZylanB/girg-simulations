@@ -23,8 +23,8 @@ class LoggableFunction(Generic[P, R]):
             if attr[0] == "_":
                 continue
             # If this isn't a LoggableFunction, just cast to string and append the name and value.
-            if not issubclass(self.__class__, value):
-                line_list.append(f"{attr}=={str(value)}")
+            if not issubclass(self.__class__, type(value)):
+                line_list.append(f"{attr}=={value}")
             # Otherwise, we add a level of indentation and recurse into the member's log_lines function.
             else:
                 line_list.append(f"Member {attr}:")

@@ -1,68 +1,98 @@
 import unittest
 from SIExperiment import *
-from SIEpidemic import SIEpidemic
+from SIEpidemic import SIEpidemic, GenericEdgeCostGenerator, GenericEdgeGenerator
 from VertexSet import lattice
-from WeightedVertexSet import WeightedVertexSet
+from WeightedVertexSet import WeightedVertexSet, GenericWeightGenerator
+
+
+def _dummy_weight_generator(_):
+    _dummy_weight_generator.x += 1
+    return [_dummy_weight_generator.x, _dummy_weight_generator.x + .25, _dummy_weight_generator.x + .5,
+            _dummy_weight_generator.x + .75]
+
+
+_dummy_weight_generator.x = -1  # type: ignore
+
+_graphs = [[],
+           [(0, 1)],
+           [(0, 1), (0, 2)],
+           [(0, 1), (0, 2), (1, 2)],
+           [(0, 1), (0, 2), (1, 2), (0, 3)],
+           [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)],
+           [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]]
+
+
+def _dummy_edge_generator(_):
+    _dummy_edge_generator.x += 1
+    return _graphs[_dummy_edge_generator.x]
+
+
+_dummy_edge_generator.x = -1  # type: ignore
+
+
+def _dummy_cost_generator():
+    _dummy_cost_generator.x += 1
+    return _dummy_cost_generator.x
+
+
+_dummy_cost_generator.x = -1  # type: ignore
 
 
 class FileIOTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUp(cls):
         entropy = 99217604857427484066604220485342406204
         cls.generator = np.random.default_rng(seed=entropy)
 
-        def weight_generator(_):
-            weight_generator.x += 1.
-            return [weight_generator.x, weight_generator.x + .25, weight_generator.x + .5, weight_generator.x + .75]
-        weight_generator.x = 0.
+        _dummy_edge_generator.x = -1
+        _dummy_weight_generator.x = -1
+        _dummy_cost_generator.x = -1
 
-        def cost_generator():
-            cost_generator.i += 1
-            return cost_generator.i
-        cost_generator.i = 0
-
-        cls.graphs = [[],
-                     [(0, 1)],
-                     [(0, 1), (0, 2)],
-                     [(0, 1), (0, 2), (1, 2)],
-                     [(0, 1), (0, 2), (1, 2), (0, 3)],
-                     [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)],
-                     [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]]
-
-        def edge_generator(_):
-            edge_generator.i += 1
-            return cls.graphs[edge_generator.i]
-        edge_generator.i = -1
+        weight_generator = GenericWeightGenerator(_dummy_weight_generator, "Test weight generator")
+        edge_generator = GenericEdgeGenerator(_dummy_edge_generator, "Test edge generator")
+        cost_generator = GenericEdgeCostGenerator(_dummy_cost_generator, "Test cost generator")
 
         unweighted_vertices = lattice(dimension=2, size=2)
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
         cls.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator,
                                   edge_generator=edge_generator, mu=0.5, zeta=1.5)
-        cls.log_path = Path.cwd() / "test_log.pickle"
+        cls.log_path = Path.cwd() / "test_logs"
+        cls.log_path.mkdir(parents=True, exist_ok=True)
+
+        cls.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
+        cls.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
 
     def testRun(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
-                                  initial_vertex_fn=lambda gen: 0, log_path=self.log_path, full_log=False,
-                                  result_fn=lambda graph, gen: len(graph.edges))
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.result_fn)
+        experiment.execute()
         self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
 
     def testFullLog(self):
-        self.log_path.unlink(missing_ok=True)
+        # Clear out existing files from previous tests to make sure new ones are created.
+        for child in self.log_path.iterdir():
+            if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
+                child.unlink()
         for i in range(7):
             (Path.cwd() / f"test_log-run-{i}.gt").unlink(missing_ok=True)
             (Path.cwd() / f"test_log-run-{i}.pickle").unlink(missing_ok=True)
 
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
-                                  initial_vertex_fn=lambda gen: 0, log_path=self.log_path, full_log=True,
-                                  result_fn=lambda graph, gen: len(graph.edges))
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
+                                  name="test", result_fn=self.result_fn)
         experiment.execute()
+        self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
         self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
 
         for i in range(7):
-            experiment.load_run(i)
+            loaded_run = experiment.load_run(i)
             self.assertEqual(self.epidemic.mu, 0.5)
             self.assertEqual(self.epidemic.zeta, 1.5)
-            self.assertEqual(set(self.graphs[i]), set(experiment.epidemic.graph.edges))
+
+            original_edges = set(_graphs[i])
+            loaded_edges = {(int(e.source()), int(e.target())) for e in loaded_run.graph.edges()}
+            self.assertEqual(original_edges, loaded_edges)
 
 
 if __name__ == '__main__':
