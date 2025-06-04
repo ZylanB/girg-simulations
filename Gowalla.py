@@ -159,11 +159,11 @@ class GowallaDataReader:
                 degree_dict[id_0] += 1
 
         print("Generating weighted vertex set...")
-        unweighted_vertices = VertexSet(dimension=2, metric=earth_distance)
+        unweighted_vertices = VertexSet(description="User locations from the Gowalla dataset", dimension=2,
+                                        metric=earth_distance)
         unweighted_vertices.set_points_from_names(ids_to_positions)
         weight_generator = from_degrees_generator(degree_dict)
-        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator,
-                                              mu=0., zeta=0.)
+        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
 
         return weighted_vertices, ties
 

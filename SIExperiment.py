@@ -178,7 +178,8 @@ class SIExperiment:
         ]
         if self.epidemic is not None:
             lines.extend([f"mu=={self.epidemic.mu}\n", f"zeta=={self.epidemic.zeta}\n",
-                          f"dimension=={self.epidemic.vertex_set.dimension}\n"])
+                          f"dimension=={self.epidemic.vertex_set.dimension}\n",
+                          f"vertex_description=={self.epidemic.vertex_set.description}\n"])
 
         # The rest is text logging only, the actual functions are saved separately in pickled form.
         lines.extend(self.initial_vertex_fn.log_lines)
@@ -188,7 +189,6 @@ class SIExperiment:
             lines.extend(self.epidemic.edge_generator.log_lines)
             lines.extend(self.epidemic.vertex_set.weight_generator.log_lines)
             lines.extend(self.epidemic.vertex_set.metric.log_lines)
-            # TODO Try and log something about how the vertex set was created, somehow???
 
         byte_lines = [line.encode("utf-8") for line in lines]
         with open(self.log_path / self.settings_name, "wb") as file:

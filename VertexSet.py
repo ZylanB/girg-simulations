@@ -31,10 +31,11 @@ class VertexData:
 
 
 class VertexSet:
-    def __init__(self, dimension: int, metric: Metric):
+    def __init__(self, dimension: int, metric: Metric, description: str = "None given"):
         """Stores a vertex set for a GIRG with spatial data and provides some spatial utility functions. Usage:
         Construct with VertexSet(dimension, distance), then set the actual vertices using either setPointsFromIds or
-        setPoints."""
+        setPoints. The description is for logging purposes."""
+        self.description = description
         self.dimension = dimension  # Dimension of the space (used for e.g. edge probabilities)
         # Distance function - should take two points in the space and return the distance between them
         self.metric = metric
@@ -194,8 +195,14 @@ class EarthDistance(Metric):
 
 def lattice(dimension: int, size: int) -> VertexSet:
     """Returns a VertexSet for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
+    if size == 1:
+        description = f"The unique point in {{0}}^{dimension}"
+    elif size == 2:
+        description = f"Integer lattice containing all points in {{0, 1}}^{dimension}"
+    else:
+        description = f"Integer lattice containing all points in {{0, ..., {size-1}}}^{dimension}"
     # Curry the dimension into the distance
-    return_value = VertexSet(dimension=dimension, metric=TorusDistance(d=dimension, size=size))
+    return_value = VertexSet(dimension=dimension, metric=TorusDistance(d=dimension, size=size), description=description)
 
     # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
     one_axis_points = [float(i) for i in range(0, size)]
@@ -218,6 +225,7 @@ def poisson_point_process(dimension: int, size: float, generator: Optional[np.ra
         next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
         points.append(next_point_coordinates)
 
-    return_value = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size))
+    description = f"Poisson point process of density 1 in [0, {size}]^{dimension}"
+    return_value = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size), description=description)
     return_value.set_points(points)
     return return_value
