@@ -1,11 +1,11 @@
-from scipy.stats import poisson
+from scipy.stats import poisson  # type: ignore
 import unittest
 from math import exp
 from typing import Callable, Dict
 
 
 def sample_tvd(sample_data: Dict[int, int], pmf: Callable[[int], float]):
-    """Given a probability mass function F and sample data with sample mass function F', returns
+    r"""Given a probability mass function F and sample data with sample mass function F', returns
     sup_x (F'(x) - F(x)). Assumes that F(x) = 0 for all x < 0."""
     remaining_mass = 1.0
     maximum_distance = 0.0
@@ -24,7 +24,7 @@ def sample_tvd(sample_data: Dict[int, int], pmf: Callable[[int], float]):
 
 
 def dkw_p_value(sample_data: Dict[int, int], pmf: Callable[[int], float], tvd_bound: float):
-    """Statistical test based on the DKW inequality ("The Tight Constant in the Dvoretzky-Kiefer-Wolfowitz
+    r"""Statistical test based on the DKW inequality ("The Tight Constant in the Dvoretzky-Kiefer-Wolfowitz
     Inequality" by P. Massart, Annals of Probability 18(3), 1990.) The null hypothesis is that sample_data is drawn
     from a distribution with total variation distance at least tvd_bound away from the distribution of pmf. This
     function returns an upper bound on the p-value subject to the assumption that elements of sample_data are drawn
@@ -35,17 +35,17 @@ def dkw_p_value(sample_data: Dict[int, int], pmf: Callable[[int], float], tvd_bo
     n = sum(sample_data.values())
     sample_distance_from_pmf = sample_tvd(sample_data=sample_data, pmf=pmf)
 
-    """If the sample itself is further than tvd_bound from the target distribution, then we're clearly not going to get 
+    r"""If the sample itself is further than tvd_bound from the target distribution, then we're clearly not going to get 
     anything of value so just return an upper bound of 1."""
     if tvd_bound < sample_distance_from_pmf:
         return 1.0
 
-    """Write the sample data's true pmf as F', write its sample pmf as \hat{F'}, and write the given pmf be F. Then 
+    r"""Write the sample data's true pmf as F', write its sample pmf as \hat{F'}, and write the given pmf be F. Then 
     by the triangle inequality, d_TV(\hat{F'}, F') >= d_TV(F, F') - d_TV(\hat{F}, F), so the following is a lower bound 
     on d_TV(\hat{F'}, F') under the null hypothesis."""
     null_sample_generator_from_pmf_bound = tvd_bound - sample_distance_from_pmf
 
-    """The DKW inequality says that for any lambda > 0: Pr(\sqrt{n} * d_TV(\hat{F'}, F') > lambda) <=  
+    r"""The DKW inequality says that for any lambda > 0: Pr(\sqrt{n} * d_TV(\hat{F'}, F') > lambda) <=  
     2e^(-2*lambda^2). Reparameterising lambda to \sqrt{n} * nu gives Pr(d_TV(\hat{F'}, F') > nu) <= 
     2e^(-2*n*nu^2). So under the null hypothesis, the following is an upper bound on the probability of \hat{F'} 
     being at least as close to F under d_TV as it is."""

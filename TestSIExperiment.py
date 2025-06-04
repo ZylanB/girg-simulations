@@ -2,12 +2,12 @@ import unittest
 import textwrap
 from SIExperiment import *
 from SIEpidemic import SIEpidemic, GenericEdgeCostGenerator, GenericEdgeGenerator
-from VertexSet import lattice
+from VertexSet import Lattice
 from WeightedVertexSet import WeightedVertexSet, GenericWeightGenerator
 from copy import deepcopy
 
 
-def _dummy_weight_generator(_):
+def _dummy_weight_generator(_, __):
     _dummy_weight_generator.x += 1
     return [_dummy_weight_generator.x, _dummy_weight_generator.x + .25, _dummy_weight_generator.x + .5,
             _dummy_weight_generator.x + .75]
@@ -24,7 +24,7 @@ _graphs = [[],
            [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]]
 
 
-def _dummy_edge_generator(_):
+def _dummy_edge_generator(_, __):
     _dummy_edge_generator.x += 1
     return _graphs[_dummy_edge_generator.x]
 
@@ -32,7 +32,7 @@ def _dummy_edge_generator(_):
 _dummy_edge_generator.x = -1  # type: ignore
 
 
-def _dummy_cost_generator():
+def _dummy_cost_generator(_):
     _dummy_cost_generator.x += 1
     return _dummy_cost_generator.x
 
@@ -57,8 +57,8 @@ class FileIOTests(unittest.TestCase):
         edge_generator = GenericEdgeGenerator(_dummy_edge_generator, "Test edge generator")
         cost_generator = GenericEdgeCostGenerator(_dummy_cost_generator, "Test cost generator")
 
-        unweighted_vertices = lattice(dimension=2, size=2)
-        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
+        vertex_generator = Lattice(dimension=2, size=2)
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
         self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator,
                                    edge_generator=edge_generator, mu=0.5, zeta=1.5)
 
@@ -167,17 +167,18 @@ class FileIOTests(unittest.TestCase):
             saved_settings = f.read()
         expected_cfg = textwrap.dedent(f"""\
             name==test
-            log_path=={self.log_path}
+            log_path==/mnt/e/GitHub/girg-simulations/test_logs
             full_log==False
             run_count==7
             resample_edges==True
             resample_costs==True
-            seed=={self.entropy}
+            seed==99217604857427484066604220485342406204
             reset_seed==True
             mu==0.5
             zeta==1.5
             dimension==2
-            vertex_description==Integer lattice containing all points in {{0, 1}}^2
+            Vertex set generator of type <class 'VertexSet.Lattice'>:
+            \tsize==2
             Initial vertex selector of type <class 'SIExperiment.GenericInitialVertexFunction'>:
             \tdescription==Zero vertex
             Test result extractor of type <class 'SIExperiment.GenericResultFunction'>:
@@ -193,6 +194,7 @@ class FileIOTests(unittest.TestCase):
             \tsize==2
             """)
         self.assertEqual(saved_settings, expected_cfg)
+
 
 if __name__ == '__main__':
     unittest.main()

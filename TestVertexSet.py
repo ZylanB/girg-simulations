@@ -109,7 +109,7 @@ class TestVertexSet(unittest.TestCase):
 
 class TestLattice(unittest.TestCase):
     def test_1d(self):
-        test_instance = lattice(dimension=1, size=6)
+        test_instance = Lattice(dimension=1, size=6)()
         point_set = {(0.,), (1.,), (2.,), (3.,), (4.,), (5.,)}
         self.assertEqual(set(test_instance.positions), point_set)
 
@@ -122,7 +122,7 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(positions, {(2.,), (3.,), (4.,)})
 
     def test_2d(self):
-        test_instance = lattice(dimension=2, size=4)
+        test_instance = Lattice(dimension=2, size=4)()
         point_set = {(0., 0.), (0., 1.), (0., 2.), (0., 3.),
                      (1., 0.), (1., 1.), (1., 2.), (1., 3.),
                      (2., 0.), (2., 1.), (2., 2.), (2., 3.),
@@ -165,8 +165,9 @@ class TestPPP(unittest.TestCase):
         big_point_counts = defaultdict(lambda: 0)
         small_point_counts = defaultdict(lambda: 0)
 
+        instance_generator = PoissonPointProcess(dimension=2, size=10.)
         for i in range(100000):
-            instance = poisson_point_process(dimension=2, size=10., generator=generator)
+            instance = instance_generator(generator)
 
             # Lower-left corners for each square
             big_corner = generator.uniform(low=0., high=5., size=2)

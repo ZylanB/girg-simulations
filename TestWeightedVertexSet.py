@@ -1,7 +1,7 @@
 import unittest
 from TestDistribution import dkw_p_value
 from WeightedVertexSet import *
-from VertexSet import VertexSet, EuclideanDistance
+from VertexSet import FixedVertexSet, EuclideanDistance
 from collections import defaultdict
 from math import floor
 
@@ -9,18 +9,17 @@ from math import floor
 class BasicTests(unittest.TestCase):
     def setUp(self):
         self.weights = {1: 1., 2: 2.5, "abc": 3.}
-        self.generator = FixedWeightGenerator(self.weights, "Test generator")
-
-        self.vertices = VertexSet(dimension=2, metric=EuclideanDistance(d=2))
+        self.weight_gen = FixedWeightGenerator(self.weights, "Test generator")
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
-        self.vertices.set_points_from_names(points)
+        self.vertex_gen = FixedVertexSet(metric=EuclideanDistance(d=2), points=points, description="Test")
+        self.vertices = WeightedVertexSet(vertex_generator=self.vertex_gen, weight_generator=self.weight_gen)
 
         self.id_1 = self.vertices.name_to_id(1)
         self.id_2 = self.vertices.name_to_id(2)
         self.id_abc = self.vertices.name_to_id("abc")
 
     def test_fixed_weights(self):
-        output = self.generator(self.vertices)
+        output = self.weight_gen(self.vertices.vertices)
 
         self.assertEqual(self.weights[1], output[self.id_1])
         self.assertEqual(self.weights[2], output[self.id_2])
@@ -29,20 +28,19 @@ class BasicTests(unittest.TestCase):
     def test_weighted_vertex_data(self):
         mu = 2.
         zeta = 3.
-        data = WeightedVertexSet(self.vertices, self.generator)
 
-        self.assertEqual(self.weights[1], data.weight(self.id_1))
-        self.assertEqual(self.weights[2], data.weight(self.id_2))
-        self.assertEqual(self.weights["abc"], data.weight(self.id_abc))
+        self.assertEqual(self.weights[1], self.vertices.weight(self.id_1))
+        self.assertEqual(self.weights[2], self.vertices.weight(self.id_2))
+        self.assertEqual(self.weights["abc"], self.vertices.weight(self.id_abc))
 
-        data.resample_weights()
-        self.assertEqual(self.weights[1], data.weight(self.id_1))
-        self.assertEqual(self.weights[2], data.weight(self.id_2))
-        self.assertEqual(self.weights["abc"], data.weight(self.id_abc))
+        self.vertices.resample_weights()
+        self.assertEqual(self.weights[1], self.vertices.weight(self.id_1))
+        self.assertEqual(self.weights[2], self.vertices.weight(self.id_2))
+        self.assertEqual(self.weights["abc"], self.vertices.weight(self.id_abc))
 
-        self.assertEqual(2.5 ** mu * 2 ** zeta, data.penalty(self.id_1, self.id_2, mu=mu, zeta=zeta))
-        self.assertEqual(2.5 ** mu * 3 ** mu * 2 ** zeta, data.penalty(self.id_2, self.id_abc, mu=mu, zeta=zeta))
-        self.assertAlmostEqual(3.0 ** mu * 8 ** (zeta/2), data.penalty(self.id_1, self.id_abc, mu=mu, zeta=zeta),
+        self.assertEqual(2.5**mu * 2**zeta, self.vertices.penalty(self.id_1, self.id_2, mu=mu, zeta=zeta))
+        self.assertEqual(2.5**mu * 3**mu * 2**zeta, self.vertices.penalty(self.id_2, self.id_abc, mu=mu, zeta=zeta))
+        self.assertAlmostEqual(3.0**mu * 8**(zeta/2), self.vertices.penalty(self.id_1, self.id_abc, mu=mu, zeta=zeta),
                                delta=1e-13)
 
     def test_resample(self):
@@ -50,11 +48,11 @@ class BasicTests(unittest.TestCase):
         entropy = 331375102187953107209086426124205679010
         generator = np.random.default_rng(seed=entropy)
 
-        def weight_generator_fn(vertices: VertexSet) -> List[float]:
-            return [generator.random() for _ in vertices.names]
+        def weight_generator_fn(vertices: VertexSet, gen: np.random.Generator) -> List[float]:
+            return [gen.random() for _ in vertices.names]
         weight_generator = GenericWeightGenerator(_function=weight_generator_fn, description="Test weight generator")
 
-        data = WeightedVertexSet(self.vertices, weight_generator)
+        data = WeightedVertexSet(self.vertex_gen, weight_generator, generator)
         first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
         data.resample_weights()
         second_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
@@ -92,17 +90,18 @@ class TestPowerLaw(unittest.TestCase):
         entropy = 127743512994918990291592040963354975738  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
 
-        scaling = GenericEdgeWeightScaler(_function=lambda w: 2*w, description="Test scaler")
+        scaling = GenericEdgeWeightScaler(_function=lambda w, _: 2*w, description="Test scaler")
         tau = 2.5
-        weight_generator = PowerLawWeightGenerator(tau=tau, ell=scaling, generator=generator)
+        weight_generator = PowerLawWeightGenerator(tau=tau, ell=scaling)
 
         n = 100000
-        vertices = VertexSet(dimension=1, metric=EuclideanDistance(d=1))
-        vertices.set_points([(i,) for i in range(n)])
-        test_instance = WeightedVertexSet(vertices=vertices, weight_generator=weight_generator)
+        point_dict = {i: (i,) for i in range(n)}
+        vertex_gen = FixedVertexSet(metric=EuclideanDistance(d=1), points=point_dict, description="Test")
+        test_instance = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_generator,
+                                          generator=generator)
 
         weight_counts = defaultdict(lambda: 0)
-        for i in vertices.names:
+        for i in test_instance.vertices.names:
             weight_counts[floor(test_instance.weight(i))] += 1
 
         r"""Pr(floor(2*W) = i) = Pr(W <= (i+1)/2) - Pr(W <= i/2) = (2/i)^{\tau-1} - (2/(i+1))^{\tau-1}."""

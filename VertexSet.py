@@ -33,11 +33,10 @@ class VertexData:
 
 
 class VertexSet:
-    def __init__(self, dimension: int, metric: Metric, description: str = "None given"):
+    def __init__(self, dimension: int, metric: Metric):
         """Stores a vertex set for a GIRG with spatial data and provides some spatial utility functions. Usage:
         Construct with VertexSet(dimension, distance), then set the actual vertices using either setPointsFromIds or
-        setPoints. The description is for logging purposes."""
-        self.description = description
+        setPoints."""
         self.dimension = dimension  # Dimension of the space (used for e.g. edge probabilities)
         # Distance function - should take two points in the space and return the distance between them
         self.metric = metric
@@ -164,39 +163,68 @@ class EarthDistance(Metric):
         self._function = lambda x, y: haversine.haversine(x, y)
 
 
-def lattice(dimension: int, size: int) -> VertexSet:
+class VertexSetGenerator(LoggableFunction[[np.random.Generator], VertexSet]):
+    @property
+    def function_role(self) -> str:
+        return "Vertex set generator"
+
+    def __call__(self, generator: Optional[np.random.Generator] = None) -> VertexSet:
+        if generator is None:
+            generator = np.random.default_rng()
+        return super().__call__(generator)
+
+
+class FixedVertexSet(VertexSetGenerator):
+    """Returns a fixed vertex set with the given metric and with dimension inferred from the given map of vertex IDs to
+    positions in space."""
+    def __init__(self, points: Mapping[Any, Sequence[float]], metric: Metric, description: str):
+        dimension = len(next(iter(points.values())))  # Check the dimension of an arbitrary point
+        for point in points.values():
+            if len(point) != dimension:
+                raise ValueError("Points must all have the same dimension!")
+
+        def _function(_):
+            return_value = VertexSet(dimension=dimension, metric=metric)
+            return_value.set_points_from_names(points)
+            return return_value
+
+        self.description = description
+        self._function = _function
+
+
+class Lattice(VertexSetGenerator):
     """Returns a VertexSet for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
-    if size == 1:
-        description = f"The unique point in {{0}}^{dimension}"
-    elif size == 2:
-        description = f"Integer lattice containing all points in {{0, 1}}^{dimension}"
-    else:
-        description = f"Integer lattice containing all points in {{0, ..., {size-1}}}^{dimension}"
-    # Curry the dimension into the distance
-    return_value = VertexSet(dimension=dimension, metric=TorusDistance(d=dimension, size=size), description=description)
+    def __init__(self, dimension: int, size: int):
+        def _function(_):
+            # Curry the dimension into the distance
+            vertex_set = VertexSet(dimension=dimension, metric=TorusDistance(d=dimension, size=size))
 
-    # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
-    one_axis_points = [float(i) for i in range(0, size)]
-    points = list(itertools.product(one_axis_points, repeat=dimension))
-    return_value.set_points(points)
+            # Note this generates size^d points, not (size+1)^d points, as the torus wraps at the boundaries.
+            one_axis_points = [float(i) for i in range(0, size)]
+            points = list(itertools.product(one_axis_points, repeat=dimension))
+            vertex_set.set_points(points)
 
-    return return_value
+            return vertex_set
+
+        self.size = size
+        self._function = _function
 
 
-def poisson_point_process(dimension: int, size: float, generator: Optional[np.random.Generator] = None) -> VertexSet:
+class PoissonPointProcess(VertexSetGenerator):
     """Returns a VertexSet for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
-    if generator is None:
-        generator = np.random.default_rng()
+    def __init__(self, dimension: int, size: float):
+        def _function(generator: np.random.Generator) -> VertexSet:
+            # We simulate a PPP by choosing Po(size^dimension) points independently and uniformly at random.
+            point_count = generator.poisson(size ** dimension)
+            points = []
+            for i in range(point_count):
+                next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
+                points.append(next_point_coordinates)
 
-    # We simulate a PPP by choosing Po(size^dimension) points independently and uniformly at random.
-    point_count = generator.poisson(size**dimension)
-    points = []
-    for i in range(point_count):
-        next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
-        points.append(next_point_coordinates)
+            vertex_set = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size))
+            vertex_set.set_points(points)
+            return vertex_set
 
-    description = f"Poisson point process of density 1 in [0, {size}]^{dimension}"
-    return_value = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size), description=description)
-    return_value.set_points(points)
-    return return_value
+        self.size = size
+        self._function = _function

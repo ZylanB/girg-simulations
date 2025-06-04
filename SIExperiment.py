@@ -191,8 +191,8 @@ class SIExperiment:
         ]
         if self.epidemic is not None:
             lines.extend([f"mu=={self.epidemic.mu}\n", f"zeta=={self.epidemic.zeta}\n",
-                          f"dimension=={self.epidemic.vertex_set.dimension}\n",
-                          f"vertex_description=={self.epidemic.vertex_set.description}\n"])
+                          f"dimension=={self.epidemic.vertex_set.dimension}\n"])
+            lines.extend(self.epidemic.vertex_set.vertex_generator.log_lines)
 
         # The rest is text logging only, the actual functions are saved separately in pickled form.
         lines.extend(self.initial_vertex_fn.log_lines)

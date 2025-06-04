@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from SIEpidemic import SIEpidemic, EdgeGenerator, FixedGraphGenerator, EdgeCostGenerator
 from WeightedVertexSet import WeightedVertexSet, create_from_degrees_generator
-from VertexSet import VertexSet, EarthDistance
+from VertexSet import FixedVertexSet, EarthDistance
 
 
 @dataclass(slots=True)
@@ -111,7 +111,7 @@ class GowallaDataReader:
 
         print("Extracting archive...")
         with gzip.open(local_file, "rb") as gz, open(dest_path, "wb") as out:
-            shutil.copyfileobj(gz, out)
+            shutil.copyfileobj(gz, out)  # type: ignore
         print("Extraction completed.")
 
         print(f"Deleting temporary file {local_file}...")
@@ -160,12 +160,10 @@ class GowallaDataReader:
                 degree_dict[id_0] += 1
 
         print("Generating weighted vertex set...")
-        unweighted_vertices = VertexSet(description="User locations from the Gowalla dataset", dimension=2,
-                                        metric=EarthDistance())
-        unweighted_vertices.set_points_from_names(ids_to_positions)
-        weight_generator = create_from_degrees_generator(degree_dict,
-                                                         description="Vertex degrees from the Gowalla dataset")
-        weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
+        vertex_generator = FixedVertexSet(metric=EarthDistance(), points=ids_to_positions,
+                                          description="Gowalla dataset")
+        weight_generator = create_from_degrees_generator(degree_dict, description="Gowalla dataset")
+        weighted_vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
 
         return weighted_vertices, ties
 
@@ -243,7 +241,8 @@ class GowallaSIEpidemic(SIEpidemic):
     _SAVED_VERTEX_PATH = Path.cwd() / "gowalla_vertices.pickle"
     _SAVED_EDGE_PATH = Path.cwd() / "gowalla_edges.pickle"
 
-    def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float):
+    def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float,
+                 generator: Optional[np.random.Generator] = None):
         if not self._saved_graph_present():
             print("Gowalla data not present. Recreating...")
             data_reader = GowallaDataReader(vertex_path=self._SAVED_VERTEX_PATH, edge_path=self._SAVED_EDGE_PATH)
@@ -252,7 +251,7 @@ class GowallaSIEpidemic(SIEpidemic):
         vertex_set = self._load_vertices(mu, zeta)
         edge_generator = self._load_edges()
         super().__init__(vertex_set=vertex_set, edge_cost_generator=edge_cost_generator, edge_generator=edge_generator,
-                         mu=mu, zeta=zeta)
+                         mu=mu, zeta=zeta, generator=generator)
 
     @classmethod
     def _saved_graph_present(cls):

@@ -6,7 +6,7 @@ from scipy.stats import binom  # type: ignore
 
 from SIEpidemic import *
 from WeightedVertexSet import FixedWeightGenerator, WeightedVertexSet, PowerLawWeightGenerator, IdentityWeightScaler
-from VertexSet import VertexSet, EuclideanDistance, lattice
+from VertexSet import EuclideanDistance, Lattice, FixedVertexSet, TorusDistance
 
 
 class BasicTests(unittest.TestCase):
@@ -18,19 +18,19 @@ class BasicTests(unittest.TestCase):
         self.mu = 2.0
         self.zeta = 10.0
 
-        unweighted_vertices = VertexSet(dimension=self.d, metric=EuclideanDistance(d=self.d))
-        unweighted_vertices.set_points_from_names({"a": (0, 1), "b": (1, 1), "c": (1, 0), "d": (0, 0), "e": (0, 3),
-                                                   "f": (-1, -1)})
-        self.a_id = unweighted_vertices.name_to_id("a")
-        self.b_id = unweighted_vertices.name_to_id("b")
-        self.c_id = unweighted_vertices.name_to_id("c")
-        self.d_id = unweighted_vertices.name_to_id("d")
-        self.e_id = unweighted_vertices.name_to_id("e")
-        self.f_id = unweighted_vertices.name_to_id("f")
-
+        point_dict = {"a": (0, 1), "b": (1, 1), "c": (1, 0), "d": (0, 0), "e": (0, 3), "f": (-1, -1)}
+        vertex_generator = FixedVertexSet(points=point_dict, metric=EuclideanDistance(d=self.d), description="test")
         self.weights = {"a": 2., "b": 3., "c": 5., "d": 7., "e": 11., "f": 13.}
         weight_generator = FixedWeightGenerator(weights=self.weights, description="Test weights")
-        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
+
+        self.a_id = vertices.name_to_id("a")
+        self.b_id = vertices.name_to_id("b")
+        self.c_id = vertices.name_to_id("c")
+        self.d_id = vertices.name_to_id("d")
+        self.e_id = vertices.name_to_id("e")
+        self.f_id = vertices.name_to_id("f")
+        
         self.edges = [(self.a_id, self.b_id), (self.b_id, self.c_id), (self.c_id, self.d_id), (self.d_id, self.a_id),
                       (self.a_id, self.c_id), (self.a_id, self.e_id)]
         edge_generator = FixedGraphGenerator(edges=self.edges, description="Test graph")
@@ -152,10 +152,10 @@ class EdgeCostTests(unittest.TestCase):
         entropy = 252869566619441809084118758734182862550  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
         lambda_ = 1
-        cost_generator = FPPCostGenerator(lambda_=lambda_, generator=generator)
+        cost_generator = FPPCostGenerator(lambda_=lambda_)
 
         n = 100000
-        costs = [cost_generator() for _ in range(n)]
+        costs = [cost_generator(generator) for _ in range(n)]
 
         # Split into buckets
         bucket_width = 0.3
@@ -188,24 +188,21 @@ class GIRGTests(unittest.TestCase):
         entropy = 99587849537254950220960273702174246406  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
 
-        unweighted_vertices = lattice(dimension=1, size=4)
-        id_a = unweighted_vertices.position_to_id((0.,))
-        id_b = unweighted_vertices.position_to_id((1.,))
-        id_c = unweighted_vertices.position_to_id((2.,))
-        id_d = unweighted_vertices.position_to_id((3.,))
+        point_dict = {0: (0.,), 1: (1.,), 2: (2.,), 3: (3.,)}
+        vertex_generator = FixedVertexSet(metric=TorusDistance(d=1, size=4), points=point_dict, description="test")
 
-        weights = {id_a: 1.1, id_b: 1.2, id_c: 1.3, id_d: 1.4}
+        weights = {0: 1.1, 1: 1.2, 2: 1.3, 3: 1.4}
         weight_gen = FixedWeightGenerator(weights, description="Test weights")
-        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_gen)
 
-        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=.25, generator=generator)
+        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=.25)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0.)
+                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator)
 
-        vertex_a = epidemic.graph.vertex(id_a)
-        vertex_b = epidemic.graph.vertex(id_b)
-        vertex_c = epidemic.graph.vertex(id_c)
-        vertex_d = epidemic.graph.vertex(id_d)
+        vertex_a = epidemic.graph.vertex(0)
+        vertex_b = epidemic.graph.vertex(1)
+        vertex_c = epidemic.graph.vertex(2)
+        vertex_d = epidemic.graph.vertex(3)
 
         # All unit-length edges should be present with certainty (remembering we're on the torus). Other edges
         # should be present with probability (W_uW_v/|u-v|)^alpha = (W_uW_v/2)^alpha.
@@ -252,34 +249,26 @@ class GIRGTests(unittest.TestCase):
         entropy = 257965182494033889699734564010582594886  # Generated from numpy via SeedSequence().entropy
         generator = np.random.default_rng(seed=entropy)
 
-        unweighted_vertices = lattice(dimension=2, size=3)
-        id_a = unweighted_vertices.position_to_id((0., 0.))
-        id_b = unweighted_vertices.position_to_id((1., 0.))
-        id_c = unweighted_vertices.position_to_id((2., 0.))
-        id_d = unweighted_vertices.position_to_id((0., 1.))
-        id_e = unweighted_vertices.position_to_id((1., 1.))
-        id_f = unweighted_vertices.position_to_id((2., 1.))
-        id_g = unweighted_vertices.position_to_id((0., 2.))
-        id_h = unweighted_vertices.position_to_id((1., 2.))
-        id_i = unweighted_vertices.position_to_id((2., 2.))
-
-        weights = {id_a: 1., id_b: 1., id_c: 1., id_d: 1., id_e: 1., id_f: 1., id_g: 1., id_h: 1., id_i: 1.}
+        point_dict = {0: (0., 0.), 1: (1., 0.), 2: (2., 0.), 3: (0., 1.), 4: (1., 1.), 5: (2., 1.), 6: (0., 2.),
+                      7: (1., 2.), 8: (2., 2.)}
+        vertex_gen = FixedVertexSet(points=point_dict, description="test", metric=TorusDistance(d=2, size=3))
+        weights = {0: 1., 1: 1., 2: 1., 3: 1., 4: 1., 5: 1., 6: 1., 7: 1., 8: 1.}
         weight_gen = FixedWeightGenerator(weights, description="Test weights")
-        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
+        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
 
-        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=1/3, generator=generator)
+        graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=1/3)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0.)
+                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator)
 
-        vertex_a = epidemic.graph.vertex(id_a)
-        vertex_b = epidemic.graph.vertex(id_b)
-        vertex_c = epidemic.graph.vertex(id_c)
-        vertex_d = epidemic.graph.vertex(id_d)
-        vertex_e = epidemic.graph.vertex(id_e)
-        vertex_f = epidemic.graph.vertex(id_f)
-        vertex_g = epidemic.graph.vertex(id_g)
-        vertex_h = epidemic.graph.vertex(id_h)
-        vertex_i = epidemic.graph.vertex(id_i)
+        vertex_a = epidemic.graph.vertex(0)
+        vertex_b = epidemic.graph.vertex(1)
+        vertex_c = epidemic.graph.vertex(2)
+        vertex_d = epidemic.graph.vertex(3)
+        vertex_e = epidemic.graph.vertex(4)
+        vertex_f = epidemic.graph.vertex(5)
+        vertex_g = epidemic.graph.vertex(6)
+        vertex_h = epidemic.graph.vertex(7)
+        vertex_i = epidemic.graph.vertex(8)
 
         # All edges are either unit-length or diagonals (since we're on the torus). Unit-length edges should be
         # present with certainty. Diagonals should be present with probability (W_u*W_v/||u-v||^d)^\alpha, which
@@ -317,7 +306,7 @@ class GIRGTests(unittest.TestCase):
 
         target_pmf = lambda x: binom.pmf(k=x, n=18, p=diag_probability)
         p_value = dkw_p_value(sample_data=edges_present, pmf=target_pmf, tvd_bound=0.01)
-        self.assertEqual(9.284880547544271e-07, p_value)
+        self.assertEqual(5.603600406624978e-06, p_value)
 
 
 class FileIOTests(unittest.TestCase):
@@ -332,13 +321,13 @@ class FileIOTests(unittest.TestCase):
 
     def helper(self, generator: np.random.Generator):
         """Run a quick infection on 10k vertices, save it, load it, and check the two runs are equal."""
-        unweighted_vertices = lattice(dimension=2, size=100)
-        weight_gen = PowerLawWeightGenerator(tau=3, generator=generator, ell=IdentityWeightScaler())
-        vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_gen)
+        vertex_gen = Lattice(dimension=2, size=100)
+        weight_gen = PowerLawWeightGenerator(tau=3, ell=IdentityWeightScaler())
+        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
         cost_gen = FPPCostGenerator(lambda_=1.)
         edge_gen = GirgGenerator(alpha=1.8, scale_factor=1/100)
         saved_value = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen,
-                                 mu=1., zeta=0.5)
+                                 mu=1., zeta=0.5, generator=generator)
         saved_value.run_infection(np.random.randint(10000))
 
         saved_value.save_to_file(Path.cwd(), "test_graph")
