@@ -98,7 +98,7 @@ class SIExperiment:
         self.results = []
         self._current_run = 0
 
-        self.save_settings()
+        self.save()
 
         for i in range(self.run_count):
             # We don't bother resampling immediately before the first run, as we sampled once on class creation.
@@ -113,20 +113,24 @@ class SIExperiment:
         return self.results
 
     @property
-    def brief_logs_exist(self) -> bool:
-        """Returns true if a seed and results log for this experiment already exists."""
-        results_exist = (self.log_path / self.results_name).exists()
+    def configuration_exists(self) -> bool:
+        """Returns true if configuration information for this experiment has been logged."""
         settings_exist = (self.log_path / self.settings_name).exists()
         functions_exist = (self.log_path / self.functions_name).exists()
-        return results_exist and settings_exist and functions_exist
+        return settings_exist and functions_exist
 
     @property
-    def full_logs_exist(self) -> bool:
-        """Returns true if full logs for this experiment already exist, including the seed, results and SIEpidemics."""
+    def results_exist(self) -> bool:
+        """Returns true if results for this experiment have been logged."""
+        return (self.log_path / self.results_name).exists()
+
+    @property
+    def full_run_logs_exist(self) -> bool:
+        """Returns true if full logs for every run of this experiment have been logged."""
         for i in range(self.run_count):
             if not (self.log_path / self.run_name(i)).exists():
                 return False
-        return self.brief_logs_exist
+        return True
 
     def run_name(self, run_number: int) -> str:
         """Returns the filename prefix to save or load a given run number."""
@@ -138,8 +142,8 @@ class SIExperiment:
             raise RuntimeError("Attempting to save a non-existent run.")
         self.epidemic.save_to_file(folder=self.log_path, name=self.run_name(self._current_run))
 
-    def load_run(self, run_number: int) -> Optional[SIEpidemic]:
-        """Returns the SIEpidemic from the given run index loaded from file."""
+    def load_run(self, run_number: int) -> SIEpidemic:
+        """Loads the SIEpidemic from the given run index."""
         return SIEpidemic.load_from_file(folder=self.log_path, name=self.run_name(run_number))
 
     @property
@@ -162,7 +166,12 @@ class SIExperiment:
         """Returns the filename used to log the SIExperiment's settings."""
         return f"{self.name}-settings.cfg"
 
-    def save_settings(self) -> None:
+    def save(self) -> None:
+        """Saves the experiment configuration to file, to be reloaded later."""
+        self._log_settings()
+        self._log_functions()
+
+    def _log_settings(self) -> None:
         """Saves the current settings in human-readable format."""
         if self.initial_vertex_fn is None:
             raise RuntimeError("Attempting to save a non-existent initial vertex function.")
@@ -201,21 +210,25 @@ class SIExperiment:
     def load_settings(self) -> None:
         """Loads the settings of the last run from file into the current SIExperiment."""
         def check_valid(line_to_check: str, expected_lhs: str):
-            if len(line_to_check.split("=")) != 2 or line_to_check.split("=")[0] != expected_lhs:
+            if len(line_to_check.split("==")) != 2 or line_to_check.split("==")[0] != expected_lhs:
                 raise ValueError(f"Bad settings file (line {line_to_check})")
 
-        def extract_value(line_to_parse: str) -> Union[bool, int, str]:
-            rhs = line_to_parse.split("==")[1]
+        def extract_value(line_to_parse: str) -> Union[bool, int, str, Path]:
+            lhs = line_to_parse.split("==")[0]
+            rhs = line_to_parse.split("==")[1][:-1]  # Remove trailing newline
             if rhs == "True":
                 return True
             if rhs == "False":
                 return False
             if rhs.isnumeric():
                 return int(rhs)
+            if lhs == "log_path":
+                return Path(rhs)
             return rhs
 
         with open(self.log_path / self.settings_name, "rb") as file:
-            fields = ["name", "log_path", "full_log"]
+            fields = ["name", "log_path", "full_log", "run_count", "resample_edges", "resample_costs", "seed",
+                      "reset_seed"]
             for field in fields:
                 line = file.readline().decode("utf-8")
                 check_valid(line, field)
@@ -228,29 +241,31 @@ class SIExperiment:
 
     def _log_functions(self) -> None:
         """Pickles the functions for initial vertex choice and result extraction."""
-        with open(self.log_path / self.results_name, "wb") as file:
+        with open(self.log_path / self.functions_name, "wb") as file:
             dill.dump(self.initial_vertex_fn, file)
             dill.dump(self.result_fn, file)
 
     def load_functions(self) -> None:
         """Loads the functions for initial vertex choice and result extraction to the current SIExperiment."""
-        with open(self.log_path / self.results_name, "rb") as file:
+        with open(self.log_path / self.functions_name, "rb") as file:
             self.initial_vertex_fn = dill.load(file)
             self.result_fn = dill.load(file)
 
     @classmethod
-    def LoadFromFile(cls, name: str, log_path: Path) -> "SIExperiment":
-        """Loads the SIExperiment with the given name from the given folder. """
+    def load_from_file(cls, name: str, folder: Path) -> "SIExperiment":
+        """Loads the SIExperiment with the given name from the given folder. The epidemic will need to be initialised
+        manually."""
         return_value = SIExperiment(epidemic=None, run_count=0, resample_edges=False, resample_costs=False,
-                                    log_path=log_path, name=name, full_log=False, initial_vertex_fn=None,
+                                    log_path=folder, name=name, full_log=False, initial_vertex_fn=None,
                                     result_fn=None)
-        if not return_value.brief_logs_exist:
+        if not return_value.configuration_exists:
             raise FileNotFoundError(f"No existing logs found for the given SIExperiment '{name}'.")
 
         return_value.load_settings()
         return_value.load_functions()
-        return_value.results = return_value.load_results()
-        if return_value.full_logs_exist:
+        if return_value.results_exist:
+            return_value.results = return_value.load_results()
+        if return_value.full_run_logs_exist:
             return_value.epidemic = return_value.load_run(return_value.run_count - 1)
         else:
             print(f"WARNING: No full run logs exist for the given SIExperiment '{name}', epidemic set to None.")

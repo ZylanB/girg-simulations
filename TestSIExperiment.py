@@ -4,6 +4,7 @@ from SIExperiment import *
 from SIEpidemic import SIEpidemic, GenericEdgeCostGenerator, GenericEdgeGenerator
 from VertexSet import lattice
 from WeightedVertexSet import WeightedVertexSet, GenericWeightGenerator
+from copy import deepcopy
 
 
 def _dummy_weight_generator(_):
@@ -87,28 +88,33 @@ class FileIOTests(unittest.TestCase):
         experiment.execute()
 
         self.assertTrue((self.log_path / f"test-results.pickle").exists())
+        self.assertTrue((self.log_path / f"test-functions.pickle").exists())
         self.assertTrue((self.log_path / f"test-settings.cfg").exists())
 
         self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
 
     def testFullLog(self):
-        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
+        saved_experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
                                   name="test", result_fn=self.result_fn)
-        experiment.execute()
+        saved_experiment.save()
+        saved_experiment.execute()
 
         for i in range(7):
             self.assertTrue((self.log_path / f"test-run-{i}.pickle").exists())
             self.assertTrue((self.log_path / f"test-run-{i}.gt").exists())
 
         self.assertTrue((self.log_path / f"test-results.pickle").exists())
+        self.assertTrue((self.log_path / f"test-functions.pickle").exists())
         self.assertTrue((self.log_path / f"test-settings.cfg").exists())
 
-        self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
-        self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
+        loaded_experiment = SIExperiment.load_from_file(folder=self.log_path, name="test")
+
+        self.assertEqual(loaded_experiment.results, [0, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(loaded_experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
 
         for i in range(7):
-            loaded_run = experiment.load_run(i)
+            loaded_run = loaded_experiment.load_run(i)
             self.assertEqual(self.epidemic.mu, 0.5)
             self.assertEqual(self.epidemic.zeta, 1.5)
 
@@ -116,11 +122,47 @@ class FileIOTests(unittest.TestCase):
             loaded_edges = {(int(e.source()), int(e.target())) for e in loaded_run.graph.edges()}
             self.assertEqual(original_edges, loaded_edges)
 
-    def testCfgFormat(self):
+    def testConfig(self):
+        """Currently this is a hack. This thing really should be able to load an SIEpidemic from settings, but it
+        can't. The main obstacle to this is the vertex set, which we really don't want to pickle with every single
+        run. Probably wants a LoggableFunction."""
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
+                                  name="test", result_fn=self.result_fn, seed=self.entropy)
+        experiment.save()
+
+        loaded_experiment = SIExperiment.load_from_file(folder=self.log_path, name="test")
+
+        self.assertEqual(loaded_experiment.seed, experiment.seed)
+        self.assertEqual(loaded_experiment.run_count, experiment.run_count)
+        self.assertEqual(loaded_experiment.resample_edges, experiment.resample_edges)
+        self.assertEqual(loaded_experiment.resample_costs, experiment.resample_costs)
+        self.assertEqual(loaded_experiment.log_path, experiment.log_path)
+        self.assertEqual(loaded_experiment.full_log, experiment.full_log)
+        self.assertEqual(loaded_experiment.name, experiment.name)
+
+        loaded_experiment.epidemic = deepcopy(experiment.epidemic)
+        # Property maps get broken by a deepcopy operation
+        loaded_graph = loaded_experiment.epidemic.graph
+        loaded_experiment.epidemic.infection_times = loaded_graph.vertex_properties["infection_times"]
+        loaded_experiment.epidemic.infectors = loaded_graph.vertex_properties["infectors"]
+        loaded_experiment.epidemic.edge_costs = loaded_graph.edge_properties["edge_costs"]
+
+        experiment.execute()
+
+        # Sample functions don't get called on the first run.
+        _dummy_edge_generator.x = 0
+        _dummy_weight_generator.x = 0
+        _dummy_cost_generator.x = 0
+        loaded_experiment.execute()
+
+        self.assertEqual(loaded_experiment.results, experiment.results)
+
+    def testConfigFormat(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
                                   name="test", result_fn=self.result_fn, seed=self.entropy)
-        experiment.save_settings()
+        experiment.save()
         with open(self.log_path / "test-settings.cfg") as f:
             saved_settings = f.read()
         expected_cfg = textwrap.dedent(f"""\
@@ -151,11 +193,6 @@ class FileIOTests(unittest.TestCase):
             \tsize==2
             """)
         self.assertEqual(saved_settings, expected_cfg)
-
-    def testSaveLoadExperiment(self):
-        # Create experiment, run experiment, save to file, load from file into a new experiment, check equality of
-        # all the key quantities.
-        pass
 
 if __name__ == '__main__':
     unittest.main()
