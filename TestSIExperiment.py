@@ -39,10 +39,13 @@ _dummy_cost_generator.x = -1  # type: ignore
 
 
 class FileIOTests(unittest.TestCase):
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
+        self.log_path = Path.cwd() / "test_logs"
+        self.log_path.mkdir(parents=True, exist_ok=True)
+        self.clearTestFiles()
+
         entropy = 99217604857427484066604220485342406204
-        cls.generator = np.random.default_rng(seed=entropy)
+        self.generator = np.random.default_rng(seed=entropy)
 
         _dummy_edge_generator.x = -1
         _dummy_weight_generator.x = -1
@@ -54,34 +57,52 @@ class FileIOTests(unittest.TestCase):
 
         unweighted_vertices = lattice(dimension=2, size=2)
         vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
-        cls.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator,
-                                  edge_generator=edge_generator, mu=0.5, zeta=1.5)
-        cls.log_path = Path.cwd() / "test_logs"
-        cls.log_path.mkdir(parents=True, exist_ok=True)
+        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator,
+                                   edge_generator=edge_generator, mu=0.5, zeta=1.5)
 
-        cls.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
-        cls.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
+        self.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
+        self.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
 
-    def testRun(self):
+    def tearDown(self):
+        self.clearTestFiles()
+
+    def clearTestFiles(self):
+        # Clear out existing files from previous tests to make sure new ones are created.
+        for child in self.log_path.iterdir():
+            if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
+                child.unlink()
+
+    def testExecute(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
                                   name="test", result_fn=self.result_fn)
         experiment.execute()
         self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
 
-    def testFullLog(self):
-        # Clear out existing files from previous tests to make sure new ones are created.
-        for child in self.log_path.iterdir():
-            if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
-                child.unlink()
-        for i in range(7):
-            (Path.cwd() / f"test_log-run-{i}.gt").unlink(missing_ok=True)
-            (Path.cwd() / f"test_log-run-{i}.pickle").unlink(missing_ok=True)
+    def testBasicLog(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.result_fn)
+        experiment.execute()
 
+        self.assertTrue((self.log_path / f"test-results.pickle").exists())
+        self.assertTrue((self.log_path / f"test-settings.cfg").exists())
+
+        self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
+
+    def testFullLog(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
                                   name="test", result_fn=self.result_fn)
         experiment.execute()
+
+        for i in range(7):
+            self.assertTrue((self.log_path / f"test-run-{i}.pickle").exists())
+            self.assertTrue((self.log_path / f"test-run-{i}.gt").exists())
+
+        self.assertTrue((self.log_path / f"test-results.pickle").exists())
+        self.assertTrue((self.log_path / f"test-settings.cfg").exists())
+
         self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
         self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
 

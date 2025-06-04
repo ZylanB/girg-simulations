@@ -132,11 +132,11 @@ class SIExperiment:
         """Saves the current SIEpidemic (via its own method)."""
         if self.epidemic is None:
             raise RuntimeError("Attempting to save a non-existent run.")
-        self.epidemic.save_to_file(folder=self.log_path.parent, name=self.run_name(self._current_run))
+        self.epidemic.save_to_file(folder=self.log_path, name=self.run_name(self._current_run))
 
     def load_run(self, run_number: int) -> Optional[SIEpidemic]:
         """Returns the SIEpidemic from the given run index loaded from file."""
-        return SIEpidemic.load_from_file(folder=self.log_path.parent, name=self.run_name(run_number))
+        return SIEpidemic.load_from_file(folder=self.log_path, name=self.run_name(run_number))
 
     @property
     def results_name(self) -> str:
@@ -167,18 +167,18 @@ class SIExperiment:
 
         # Start with all the simple values that we can load directly.
         lines = [
-            f"name=={self.name}",
-            f"log_path=={self.log_path}",
-            f"full_log=={self.full_log}",
-            f"run_count=={self.run_count}",
-            f"resample_edges=={self.resample_edges}",
-            f"resample_costs=={self.resample_costs}",
-            f"seed=={self.seed}",
-            f"reset_seed=={self.reset_seed}"
+            f"name=={self.name}\n",
+            f"log_path=={self.log_path}\n",
+            f"full_log=={self.full_log}\n",
+            f"run_count=={self.run_count}\n",
+            f"resample_edges=={self.resample_edges}\n",
+            f"resample_costs=={self.resample_costs}\n",
+            f"seed=={self.seed}\n",
+            f"reset_seed=={self.reset_seed}\n"
         ]
         if self.epidemic is not None:
-            lines.extend([f"mu=={self.epidemic.mu}", f"zeta=={self.epidemic.zeta}",
-                          f"dimension=={self.epidemic.vertex_set.dimension}"])
+            lines.extend([f"mu=={self.epidemic.mu}\n", f"zeta=={self.epidemic.zeta}\n",
+                          f"dimension=={self.epidemic.vertex_set.dimension}\n"])
 
         # The rest is text logging only, the actual functions are saved separately in pickled form.
         lines.extend(self.initial_vertex_fn.log_lines)

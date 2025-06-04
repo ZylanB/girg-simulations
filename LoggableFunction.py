@@ -16,7 +16,7 @@ class LoggableFunction(Generic[P, R]):
     @property
     def log_lines(self) -> List[str]:
         """Returns a list of lines to log all public members of the function. Allows for nested LoggableFunctions."""
-        line_list = [f"Logged function of type {type(self)}:"]
+        line_list = [f"Logged function of type {type(self)}:\n"]
 
         for attr, value in self.__dict__.items():
             # Ignore private members.
@@ -24,11 +24,11 @@ class LoggableFunction(Generic[P, R]):
                 continue
             # If this isn't a LoggableFunction, just cast to string and append the name and value.
             if not issubclass(self.__class__, type(value)):
-                line_list.append(f"{attr}=={value}")
+                line_list.append(f"\t{attr}=={value}\n")
             # Otherwise, we add a level of indentation and recurse into the member's log_lines function.
             else:
-                line_list.append(f"Member {attr}:")
-                added_lines = ['\t' + line for line in value.log_lines()]
+                line_list.append(f"\tMember {attr}:\n")
+                added_lines = ['\t\t' + line for line in value.log_lines()]
                 line_list.extend(added_lines)
 
         return line_list
