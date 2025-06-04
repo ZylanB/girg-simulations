@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 import datetime
 import requests
 import gzip
 from collections import defaultdict
 from pathlib import Path
 import shutil
-import dill
+import dill  # type: ignore
 
 import numpy as np
 import matplotlib.pyplot as plt
-from SIEpidemic import SIEpidemic, fixed_graph_generator
-from WeightedVertexSet import WeightedVertexSet, from_degrees_generator
-from VertexSet import VertexSet, earth_distance
+from SIEpidemic import SIEpidemic, EdgeGenerator, FixedGraphGenerator, EdgeCostGenerator
+from WeightedVertexSet import WeightedVertexSet, create_from_degrees_generator
+from VertexSet import VertexSet, EarthDistance
 
 
 @dataclass(slots=True)
@@ -43,10 +43,11 @@ class TieDatum:
     modal_positions: List[Tuple[float, float]]
 
     @property
-    def max_distance(self):
+    def max_distance(self) -> float:
         """Returns the maximum possible difference our choice of position for the user could make, i.e. the maximum
         distance between any pair of coordinates in self.modal_positions."""
-        return max([earth_distance(x, y) for x in self.modal_positions for y in self.modal_positions])
+        d = EarthDistance()
+        return max([d(x, y) for x in self.modal_positions for y in self.modal_positions])
 
 
 class GowallaDataReader:
@@ -160,14 +161,15 @@ class GowallaDataReader:
 
         print("Generating weighted vertex set...")
         unweighted_vertices = VertexSet(description="User locations from the Gowalla dataset", dimension=2,
-                                        metric=earth_distance)
+                                        metric=EarthDistance())
         unweighted_vertices.set_points_from_names(ids_to_positions)
-        weight_generator = from_degrees_generator(degree_dict)
+        weight_generator = create_from_degrees_generator(degree_dict,
+                                                         description="Vertex degrees from the Gowalla dataset")
         weighted_vertices = WeightedVertexSet(vertices=unweighted_vertices, weight_generator=weight_generator)
 
         return weighted_vertices, ties
 
-    def _get_user_position(self, check_in_list: List[CheckIn]) -> Tuple[Tuple[float, float], Optional[TieDatum]]:
+    def _get_user_position(self, check_in_list: Sequence[CheckIn]) -> Tuple[Tuple[float, float], Optional[TieDatum]]:
         """Given a list of CheckIns for a user, discretise their positions to a (very) roughly 25kmx25km grid,
         choose their most common position on that grid, then return a random CheckIn position restricted to that grid
         square. NB this 25kmx25km grid is the same metric used in the original Gowalla paper, but also NB it's
@@ -241,7 +243,7 @@ class GowallaSIEpidemic(SIEpidemic):
     _SAVED_VERTEX_PATH = Path.cwd() / "gowalla_vertices.pickle"
     _SAVED_EDGE_PATH = Path.cwd() / "gowalla_edges.pickle"
 
-    def __init__(self, edge_cost_generator: Callable[[], float], mu: float, zeta: float):
+    def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float):
         if not self._saved_graph_present():
             print("Gowalla data not present. Recreating...")
             data_reader = GowallaDataReader(vertex_path=self._SAVED_VERTEX_PATH, edge_path=self._SAVED_EDGE_PATH)
@@ -249,7 +251,8 @@ class GowallaSIEpidemic(SIEpidemic):
 
         vertex_set = self._load_vertices(mu, zeta)
         edge_generator = self._load_edges()
-        super().__init__(vertex_set=vertex_set, edge_cost_generator=edge_cost_generator, edge_generator=edge_generator)
+        super().__init__(vertex_set=vertex_set, edge_cost_generator=edge_cost_generator, edge_generator=edge_generator,
+                         mu=mu, zeta=zeta)
 
     @classmethod
     def _saved_graph_present(cls):
@@ -267,32 +270,32 @@ class GowallaSIEpidemic(SIEpidemic):
         return_set.zeta = zeta
         return return_set
 
-    def _load_edges(self) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
+    def _load_edges(self) -> EdgeGenerator:
         """Reads the edge set for the Gowalla dataset from EDGE_DATA_PATH and returns an edge generator that can be
         passed into an SIEpidemic."""
         print("Loading edge generator...")
         with open(self._SAVED_EDGE_PATH, "rb") as file:
             edges = dill.load(file)
 
-        return fixed_graph_generator(edges)
+        return FixedGraphGenerator(edges, description="Interactions from the Gowalla dataset")
 
 
-def plot_tie_data(data: List[TieDatum]):
+def plot_tie_data(data: Sequence[TieDatum]):
     """INTERNAL USE: Displays a plot that roughly indicates the quality of our current tie-breaking approach."""
-    data = np.asarray([datum.max_distance for datum in data])
+    distance_data = np.asarray([datum.max_distance for datum in data])
     bin_count = 50
 
     # Space bins evenly on a log scale.
-    bins = np.logspace(np.log10(data.min()), np.log10(data.max()), bin_count)
+    bins = np.logspace(np.log10(distance_data.min()), np.log10(distance_data.max()), bin_count)
 
     plt.figure()
-    plt.hist(data, bins=bins)
+    plt.hist(distance_data, bins=bins)  # type: ignore
     plt.xscale('log')
     plt.xlabel('Max change in distance due to tie')
     plt.ylabel('Number of ties')
-    plt.title(f"{len(data)} total ties")
+    plt.title(f"{len(distance_data)} total ties")
 
-    pct_50, pct_75, pct_90 = np.percentile(data, [50, 75, 90])
+    pct_50, pct_75, pct_90 = np.percentile(distance_data, [50, 75, 90])
     for pct, label in zip([pct_50, pct_75, pct_90], ['50th percentile', '75th percentile', '90th percentile']):
         plt.axvline(pct, linestyle='--')
         plt.text(pct, plt.ylim()[1] * 0.9, label, rotation=90, va='top', fontsize='small')

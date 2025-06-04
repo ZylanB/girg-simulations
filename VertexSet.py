@@ -3,12 +3,12 @@ import haversine  # type: ignore
 import functools
 import itertools
 import numpy as np
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Mapping, Set, Sequence
 from dataclasses import dataclass
 from LoggableFunction import LoggableFunction
 
 
-class Metric(LoggableFunction[[Tuple[float, ...], Tuple[float, ...]], float]):
+class Metric(LoggableFunction[[Sequence[float], Sequence[float]], float]):
     """Distance function between two positions in a VertexSet. Should be symmetric."""
     @property
     def function_role(self):
@@ -28,7 +28,7 @@ class VertexData:
     this must be an integer between 0 and the number of vertices in the network. position is the vertex's coordinates
     in space. name is an arbitrary user-defined name."""
     id_: int
-    position: Tuple[float, ...]
+    position: Sequence[float]
     name: Any
 
 
@@ -45,25 +45,25 @@ class VertexSet:
         # individual values is super-slow. We'll store a NumPy array separately for when it's useful and use the
         # position_to_id map to go from the raw positions stored in the NumPy array to the IDs stored here.
         self._vertex_id_dict: Dict[int, VertexData] = {}
-        self._vertex_position_dict: Dict[Tuple[float, ...], VertexData] = {}
+        self._vertex_position_dict: Dict[Sequence[float], VertexData] = {}
         self._vertex_name_dict: Dict[Any, VertexData] = {}
 
     def name_to_data(self, name: str) -> VertexData:
         return self._vertex_name_dict[name]
 
-    def name_to_position(self, name: Any) -> Tuple[float, ...]:
+    def name_to_position(self, name: Any) -> Sequence[float]:
         return self._vertex_name_dict[name].position
 
     def name_to_id(self, name: Any) -> int:
         return self._vertex_name_dict[name].id_
 
-    def position_to_data(self, position: Tuple[float, ...]) -> VertexData:
+    def position_to_data(self, position: Sequence[float]) -> VertexData:
         return self._vertex_position_dict[position]
 
-    def position_to_name(self, position: Tuple[float, ...]) -> Any:
+    def position_to_name(self, position: Sequence[float]) -> Any:
         return self._vertex_position_dict[position].name
 
-    def position_to_id(self, position: Tuple[float, ...]) -> int:
+    def position_to_id(self, position: Sequence[float]) -> int:
         return self._vertex_position_dict[position].id_
 
     def id_to_data(self, id_: int) -> VertexData:
@@ -72,14 +72,14 @@ class VertexSet:
     def id_to_name(self, id_: int) -> Any:
         return self._vertex_id_dict[id_].name
 
-    def id_to_position(self, id_: int) -> Tuple[float, ...]:
+    def id_to_position(self, id_: int) -> Sequence[float]:
         return self._vertex_id_dict[id_].position
 
     def distance(self, id_x, id_y):
         """Returns the distance between the two points with the given IDs."""
         return self.metric(self.id_to_position(id_x), self.id_to_position(id_y))
 
-    def set_points_from_names(self, points: Dict[Any, Tuple[float, ...]]):
+    def set_points_from_names(self, points: Mapping[Any, Sequence[float]]):
         """Initialises points from a pre-existing dictionary mapping names to coordinates"""
         for id_, (name, position) in enumerate(points.items()):
             new_vertex = VertexData(id_=id_, position=position, name=name)
@@ -87,7 +87,7 @@ class VertexSet:
             self._vertex_position_dict[position] = new_vertex
             self._vertex_name_dict[name] = new_vertex
 
-    def set_points(self, points: List[Tuple[float, ...]]):
+    def set_points(self, points: Sequence[Sequence[float]]):
         """Initialises points without pre-set names (generating arbitrary names)"""
         self.set_points_from_names({i: points[i] for i in range(len(points))})
 
@@ -102,7 +102,7 @@ class VertexSet:
         return len(self._vertex_id_dict)
 
     @property
-    def positions(self) -> Set[Tuple[float, ...]]:
+    def positions(self) -> Set[Sequence[float]]:
         """Returns the set of all positions in the vertex set."""
         return set(self._vertex_position_dict.keys())
 
@@ -115,7 +115,7 @@ class VertexSet:
     def ids(self) -> Set[int]:
         return set(self._vertex_id_dict.keys())
 
-    def get_ids_in_annulus(self, center: Tuple[float, ...], inner_radius: float, outer_radius: float) -> List[int]:
+    def get_ids_in_annulus(self, center: Sequence[float], inner_radius: float, outer_radius: float) -> List[int]:
         """Returns a list of IDs of points whose distance from center lies in [inner_radius, outer_radius]."""
         id_list = []
         for vertex in self.vertex_data:
@@ -124,7 +124,7 @@ class VertexSet:
                 id_list.append(vertex.id_)
         return id_list
 
-    def get_ids_in_ball(self, center: Tuple[float, ...], radius: float) -> List[int]:
+    def get_ids_in_ball(self, center: Sequence[float], radius: float) -> List[int]:
         """Returns a list of IDs of points which lie in the closed ball of radius r centered at center."""
         return self.get_ids_in_annulus(center=center, inner_radius=0, outer_radius=radius)
 
@@ -136,7 +136,7 @@ class EuclideanDistance(Metric):
         self._function = functools.partial(self._euclidean_distance, d=d)
 
     @staticmethod
-    def _euclidean_distance(x: Tuple[float, ...], y: Tuple[float, ...], d: int) -> float:
+    def _euclidean_distance(x: Sequence[float], y: Sequence[float], d: int) -> float:
         return pow(sum((x[i] - y[i]) ** d for i in range(len(x))), 1 / d)
 
 
@@ -148,7 +148,7 @@ class TorusDistance(Metric):
         self._function = functools.partial(self._torus_distance, d=d, size=size)
 
     @staticmethod
-    def _torus_distance(x: Tuple[float, ...], y: Tuple[float, ...], size: float, d: int) -> float:
+    def _torus_distance(x: Sequence[float], y: Sequence[float], size: float, d: int) -> float:
         l1_distances = [0.] * d
         for i in range(d):
             interval_distance = abs(x[i] - y[i])
@@ -162,37 +162,6 @@ class EarthDistance(Metric):
         (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
     def __init__(self):
         self._function = lambda x, y: haversine.haversine(x, y)
-
-
-# def euclidean_distance(x: Tuple[float, ...], y: Tuple[float, ...], d: int) -> float:
-#     """Returns the distance between x and y in a Euclidean space of dimension d."""
-#     return pow(sum((x[i] - y[i])**d for i in range(len(x))), 1/d)
-#
-#
-# def euclidean_distance_function(d: int) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
-#     """Returns the distance *function* for a Euclidean space of dimension d, i.e. currying d into euclideanDistance."""
-#     return functools.partial(euclidean_distance, d=d)
-#
-#
-# def torus_distance(x: Tuple[float], y: Tuple[float], size: float, d: int) -> float:
-#     """Returns the distance between x and y on [0,size]^d considered as a torus."""
-#     l1_distances = [0]*d
-#     for i in range(d):
-#         interval_distance = abs(x[i] - y[i])
-#         l1_distances[i] = interval_distance if interval_distance <= size/2 else size - interval_distance
-#
-#     return pow(sum(x**d for x in l1_distances), 1/d)
-#
-#
-# def torus_distance_function(d: int, size: float) -> Callable[[Tuple[float, ...], Tuple[float, ...]], float]:
-#     """Returns the Torus distance *function* for [0,size]^d, i.e. currying d and size into euclideanDistance."""
-#     return functools.partial(torus_distance, d=d, size=size)
-#
-#
-# def earth_distance(x: Tuple[float, ...], y: Tuple[float, ...]) -> float:
-#     """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
-#     (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
-#     return haversine.haversine(x, y)
 
 
 def lattice(dimension: int, size: int) -> VertexSet:

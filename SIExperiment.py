@@ -1,5 +1,5 @@
 from SIEpidemic import SIEpidemic
-from typing import Any,  List, Optional, Union
+from typing import Any, List, Optional, Union
 from pathlib import Path
 import numpy as np
 import dill  # type: ignore

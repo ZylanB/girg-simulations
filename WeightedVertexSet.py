@@ -1,12 +1,12 @@
 from VertexSet import VertexSet
-from typing import Any, Dict, List, Optional
-import girg_sampling.girgs as gs
+from typing import Any, Mapping, Optional, List, Sequence
+import girg_sampling.girgs as gs  # type: ignore
 import numpy as np
 from dataclasses import dataclass
 from LoggableFunction import LoggableFunction
 
 
-class WeightGenerator(LoggableFunction[[VertexSet], List[float]]):
+class WeightGenerator(LoggableFunction[[VertexSet], Sequence[float]]):
     """Function to generate a list of weights for the given vertex set."""
     @property
     def function_role(self):
@@ -27,7 +27,7 @@ class WeightedVertexSet:
         VertexSet, returning a dictionary from vertex IDs to weights."""
         self.vertices = vertices
         self.weight_generator = weight_generator
-        self.weights: List[float] = []
+        self.weights: Sequence[float] = []
         self.resample_weights()
 
     def __getattr__(self, item):
@@ -39,7 +39,7 @@ class WeightedVertexSet:
         """Returns the weight of the vertex with the given id."""
         return self.weights[id_]
 
-    def resample_weights(self) -> List[float]:
+    def resample_weights(self) -> Sequence[float]:
         """Resamples the vertex weights from the given generator function."""
         self.weights = self.weight_generator(self.vertices)
         return self.weights
@@ -105,51 +105,16 @@ class PowerLawWeightGenerator(WeightGenerator):
         return weights
 
 
-# def power_law_generator(tau: float, ell: Callable[[float], float] = id,
-#                         generator: Optional[np.random.Generator] = None) -> PowerLawWeightGenerator:
-#     """Returns a weight sampling function for WeightedVertexSet which samples weights W i.i.d. from a power law, taking
-#     Pr(W >= x) = 1 / x^{\tau - 1} and using the specified RNG, then applies the given scaling map to each weight."""
-#     if tau <= 2:
-#         raise ValueError("tau must be greater than 2 for the expected degrees to be finite.")
-#     if generator is None:
-#         generator = np.random.default_rng()
-#
-#     function = lambda vertices: _power_law_sample(vertices=vertices, tau=tau, scaling=ell, generator=generator)
-#     return WeightGenerator(function_=function, tau=tau)
-#
-#
-# def _power_law_sample(vertices: VertexSet, tau: float, scaling: Callable[[float], float],
-#                       generator: np.random.Generator) -> List[float]:
-#     """Samples weights W for the given VertexSet i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
-#     and using the specified RNG, then applies the given scaling map to each weight."""
-#
-#     # The upper bound isn't included in the range, so this samples a 31-bit integer to pass to Cython.
-#     C_seed = generator.integers(low=0, high=2**31)
-#     weights = gs.generateWeights(n=vertices.size, ple=tau, seed=C_seed)
-#     if scaling is not id:
-#         efficient_ell = np.vectorize(scaling)
-#         weights = efficient_ell(weights)
-#
-#     # We map an arbitrary weight to each vertex ID since they're all i.i.d. anyway.
-#     return weights
-
-
 class FixedWeightGenerator(WeightGenerator):
-    def __init__(self, weights: Dict[Any, float], description: str) -> None:
+    def __init__(self, weights: Mapping[Any, float], description: str) -> None:
         """Takes a dictionary mapping vertex names to weights, and returns a constant weight 'sampling function' which
         just returns a list mapping each vertex ID to its weight."""
         self.description = description
         self._function = lambda vertices: [weights[vertices.id_to_name(i)] for i in range(len(weights))]
 
 
-# def fixed_weights_generator(weights: Dict[Any, float]) -> Callable[[VertexSet], List[float]]:
-#     """Takes a dictionary mapping vertex names to weights, and returns a constant weight 'sampling function' which just
-#     returns a list mapping each vertex ID to its weight."""
-#     return lambda vertices: [weights[vertices.id_to_name(i)] for i in range(len(weights))]
-
-
-def create_from_degrees_generator(degrees: Dict[Any, int], description: str) -> FixedWeightGenerator:
-    """Returns a weight sampling function for WeightedVertexSet which 'samples' weights by estimating them based on
+def create_from_degrees_generator(degrees: Mapping[Any, int], description: str) -> FixedWeightGenerator:
+    r"""Returns a weight sampling function for WeightedVertexSet which 'samples' weights by estimating them based on
     a supplied dictionary mapping vertex names to vertex degrees in the base graph. Used for the Gowalla dataset.
 
     IMPORTANT: We really don't understand why this seems to work. Do not submit the paper before we do. A more

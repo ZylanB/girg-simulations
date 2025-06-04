@@ -152,6 +152,10 @@ class FileIOTests(unittest.TestCase):
             """)
         self.assertEqual(saved_settings, expected_cfg)
 
+    def testSaveLoadExperiment(self):
+        # Create experiment, run experiment, save to file, load from file into a new experiment, check equality of
+        # all the key quantities.
+        pass
 
 if __name__ == '__main__':
     unittest.main()

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from LoggableFunction import LoggableFunction
 from WeightedVertexSet import WeightedVertexSet, FixedWeightGenerator
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 from VertexSet import lattice
 
 
@@ -28,7 +28,7 @@ class GenericEdgeCostGenerator(EdgeCostGenerator):
         self._function = _function
 
 
-class EdgeGenerator(LoggableFunction[[WeightedVertexSet], List[Tuple[int, int]]]):
+class EdgeGenerator(LoggableFunction[[WeightedVertexSet], Sequence[Tuple[int, int]]]):
     """Function to generate the edges of our graph; these are stored in a tuple since sets aren't Hashable, but are
     nevertheless undirected."""
     @property
@@ -264,7 +264,7 @@ class GirgGenerator(EdgeGenerator):
 class FixedGraphGenerator(EdgeGenerator):
     """'Edge generator' for a constant graph such as the Gowalla dataset, to be passed to SIEpidemic. The edges
     should be specified as a list of pairs of vertex IDs."""
-    def __init__(self, edges: List[Tuple[int, int]], description: str) -> None:
+    def __init__(self, edges: Sequence[Tuple[int, int]], description: str) -> None:
         self.description = description
         self._function = lambda vertices: edges
 
@@ -284,64 +284,3 @@ class ConstantCostGenerator(EdgeCostGenerator):
     def __init__(self, c: float) -> None:
         self.c = c
         self._function = lambda: c
-
-
-# def girg_generator(alpha: float, scale_factor: float, generator: Optional[np.random.Generator] = None,
-#                    average_degree: Optional[float] = None) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
-#     """Generates an SIEpidemic whose graph is a GIRG on the given vertex_set with the given long-range parameter
-#     alpha and the given RNG seed. The connection probability between u and v is max(1, W_uW_v/|u-v|^d)^\alpha. If
-#     average_degree is set then the GIRG library uses binary search to find a constant c to scale the weights by which
-#     gives the appropriate average degree. The generator here should only be used for testing purposes, in which case
-#     it will be used to generate random seeds - otherwise you should leave this as None and let the sampling library
-#     generate its own seed.
-#
-#     The GIRG generation code we're using requires everything to be scaled down to [0,1]^d, using connection probability
-#     max(1, W_uW_v/n|u-v|^d)^\alpha, and we don't want to change that. As long as we're working in [0, n^{1/d}]^d, this
-#     is equivalent to scaling everything down by a factor of n^{1/d}. The one catch is that we need to pass this in as
-#     an argument rather than generating it from the vertex set, since otherwise if we have a PPP with slightly less than
-#     n points then we might end up with points outside [0, 1]^d and the generation code will crash. So instead we pass
-#     1/n^{1/d} in as the scale_factor argument."""
-#     def generator_to_return(vertex_set: WeightedVertexSet) -> List[Tuple[Any, Any]]:
-#         seed = None
-#         if generator:
-#             seed = generator.integers(low=0, high=2**31)  # girg-sampling takes 31-bit seeds, "high" is not inclusive.
-#
-#         weights = [vertex_set.weight(i) for i in range(vertex_set.size)]
-#
-#         """The GIRG generator creates a GIRG with connection probability between u and v given by max(1,
-#         W_uW_v/n|u-v|^d)^alpha. It also requires all points to lie in [0,1]^d. So we need to scale everything down by
-#         a factor of n^{1/d}."""
-#         positions = [vertex_set.id_to_position(i) for i in range(vertex_set.size)]
-#         scaled_positions = []
-#         for position in positions:
-#             scaled_position = [position[i] * scale_factor for i in range(vertex_set.dimension)]
-#             scaled_positions.append(scaled_position)
-#
-#         if average_degree is not None:
-#             c = gs.scaleWeights(weights=weights, desiredAvgDegree=average_degree, dimension=vertex_set.dimension,
-#                                 alpha=alpha)
-#             weights = [c * weight for weight in weights]
-#
-#         return gs.generateEdges(weights=weights, positions=scaled_positions, alpha=alpha,
-#                                 scale=scale_factor ** vertex_set.dimension, seed=seed)
-#
-#     return generator_to_return
-#
-#
-# def fixed_graph_generator(edges: List[Tuple[int, int]]) -> Callable[[WeightedVertexSet], List[Tuple[int, int]]]:
-#     """'Edge generator' for a constant graph such as the Gowalla dataset, to be passed to SIEpidemic. The edges
-#     should be specified as a list of pairs of vertex IDs."""
-#     return lambda vertices: edges
-#
-#
-# def fpp_generator(lambda_: float, generator: Optional[np.random.Generator] = None) -> Callable[[], float]:
-#     """Edge cost generator for first passage percolation (i.e. the random part of edge costs are i.i.d. exponentially
-#     distributed) with the given parameter."""
-#     if generator is None:
-#         generator = np.random.default_rng()
-#     return lambda: generator.exponential(scale=lambda_)
-#
-#
-# def constant_generator(c: float) -> Callable[[], float]:
-#     """Edge cost generator for testing purposes that sets the random part of all edge costs to the given constant."""
-#     return lambda: c

@@ -1,7 +1,7 @@
 import unittest
 import datetime
 
-import graph_tool.topology
+import graph_tool.topology  # type: ignore
 import numpy as np
 from Gowalla import *
 
