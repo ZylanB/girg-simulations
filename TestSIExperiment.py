@@ -1,4 +1,5 @@
 import unittest
+import textwrap
 from SIExperiment import *
 from SIEpidemic import SIEpidemic, GenericEdgeCostGenerator, GenericEdgeGenerator
 from VertexSet import lattice
@@ -44,8 +45,8 @@ class FileIOTests(unittest.TestCase):
         self.log_path.mkdir(parents=True, exist_ok=True)
         self.clearTestFiles()
 
-        entropy = 99217604857427484066604220485342406204
-        self.generator = np.random.default_rng(seed=entropy)
+        self.entropy = 99217604857427484066604220485342406204
+        self.generator = np.random.default_rng(seed=self.entropy)
 
         _dummy_edge_generator.x = -1
         _dummy_weight_generator.x = -1
@@ -114,6 +115,42 @@ class FileIOTests(unittest.TestCase):
             original_edges = set(_graphs[i])
             loaded_edges = {(int(e.source()), int(e.target())) for e in loaded_run.graph.edges()}
             self.assertEqual(original_edges, loaded_edges)
+
+    def testCfgFormat(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.result_fn, seed=self.entropy)
+        experiment.save_settings()
+        with open(self.log_path / "test-settings.cfg") as f:
+            saved_settings = f.read()
+        expected_cfg = textwrap.dedent(f"""\
+            name==test
+            log_path=={self.log_path}
+            full_log==False
+            run_count==7
+            resample_edges==True
+            resample_costs==True
+            seed=={self.entropy}
+            reset_seed==True
+            mu==0.5
+            zeta==1.5
+            dimension==2
+            vertex_description==Integer lattice containing all points in {{0, 1}}^2
+            Initial vertex selector of type <class 'SIExperiment.GenericInitialVertexFunction'>:
+            \tdescription==Zero vertex
+            Test result extractor of type <class 'SIExperiment.GenericResultFunction'>:
+            \tdescription==Edge count
+            Edge cost generator of type <class 'SIEpidemic.GenericEdgeCostGenerator'>:
+            \tdescription==Test cost generator
+            Edge set generator of type <class 'SIEpidemic.GenericEdgeGenerator'>:
+            \tdescription==Test edge generator
+            Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGenerator'>:
+            \tdescription==Test weight generator
+            Distance function on vertex set of type <class 'VertexSet.TorusDistance'>:
+            \td==2
+            \tsize==2
+            """)
+        self.assertEqual(saved_settings, expected_cfg)
 
 
 if __name__ == '__main__':
