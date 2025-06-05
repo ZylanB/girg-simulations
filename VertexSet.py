@@ -131,7 +131,7 @@ class VertexSet:
 class EuclideanDistance(Metric):
     """Returns the distance between x and y in a Euclidean space of dimension d."""
     def __init__(self, d: int):
-        self.d = d
+        self.dimension = d
         self._function = functools.partial(self._euclidean_distance, d=d)
 
     @staticmethod
@@ -142,7 +142,7 @@ class EuclideanDistance(Metric):
 class TorusDistance(Metric):
     def __init__(self, d: int, size: float):
         """Returns the distance between x and y on [0,size]^d considered as a torus."""
-        self.d = d
+        self.dimension = d
         self.size = size
         self._function = functools.partial(self._torus_distance, d=d, size=size)
 
@@ -188,6 +188,7 @@ class FixedVertexSet(VertexSetGenerator):
             return_value.set_points_from_names(points)
             return return_value
 
+        self.dimension = dimension
         self.description = description
         self._function = _function
 
@@ -207,6 +208,7 @@ class Lattice(VertexSetGenerator):
             return vertex_set
 
         self.size = size
+        self.dimension = dimension
         self._function = _function
 
 
@@ -227,4 +229,5 @@ class PoissonPointProcess(VertexSetGenerator):
             return vertex_set
 
         self.size = size
+        self.dimension = dimension
         self._function = _function
