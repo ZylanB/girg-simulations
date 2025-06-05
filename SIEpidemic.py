@@ -9,26 +9,26 @@ import girg_sampling.girgs as gs  # type: ignore
 from pathlib import Path
 
 from LoggableFunction import LoggableFunction
-from WeightedVertexSet import WeightedVertexSet, FixedWeightGenerator
+from WeightedVertexSet import WeightedVertexSet, FixedWeightGen
 from typing import Any, List, Optional, Sequence, Tuple
 from VertexSet import Lattice
 
 
-class EdgeCostGenerator(LoggableFunction[[np.random.Generator], float]):
+class EdgeCostGen(LoggableFunction[[np.random.Generator], float]):
     """Function to generate the random part of a single edge cost (the "L" per our notation)."""
     @property
     def function_role(self):
         return "Edge cost generator"
 
 
-class GenericEdgeCostGenerator(EdgeCostGenerator):
+class GenericEdgeCostGen(EdgeCostGen):
     """Lightweight option to just pass in the function you care about with a description for logging."""
     def __init__(self, _function, description: str) -> None:
         self.description = description
         self._function = _function
 
 
-class EdgeGenerator(LoggableFunction[[WeightedVertexSet, np.random.Generator], Sequence[Tuple[int, int]]]):
+class EdgeGen(LoggableFunction[[WeightedVertexSet, np.random.Generator], Sequence[Tuple[int, int]]]):
     """Function to generate the edges of our graph; these are stored in a tuple since sets aren't Hashable, but are
     nevertheless undirected."""
     @property
@@ -36,7 +36,7 @@ class EdgeGenerator(LoggableFunction[[WeightedVertexSet, np.random.Generator], S
         return "Edge set generator"
 
 
-class GenericEdgeGenerator(EdgeGenerator):
+class GenericEdgeGen(EdgeGen):
     """Lightweight option to just pass in the function you care about with a description for logging."""
     def __init__(self, _function, description: str) -> None:
         self.description = description
@@ -48,11 +48,11 @@ class SIEpidemic:
     should return a sample of the *random* part of an edge's cost, i.e. not including degree or spatial penalties
     (which are calculated in WeightedVertexSet). Mu should be the weight penalty, and zeta should be the spatial
     penalty. Name determines the filenames used for logging."""
-    def __init__(self, vertex_set: WeightedVertexSet, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float,
-                 edge_generator: EdgeGenerator, name: str, rng: np.random.Generator) -> None:
+    def __init__(self, vertex_set: WeightedVertexSet, edge_cost_gen: EdgeCostGen, mu: float, zeta: float,
+                 edge_gen: EdgeGen, name: str, rng: np.random.Generator) -> None:
         self.vertex_set = vertex_set
-        self.edge_cost_generator = edge_cost_generator
-        self.edge_generator = edge_generator
+        self.edge_cost_gen = edge_cost_gen
+        self.edge_gen = edge_gen
         self.mu = mu
         self.zeta = zeta
         self.name = name
@@ -78,7 +78,7 @@ class SIEpidemic:
         """(Re)samples the edge set of the graph from the given vertex set. Vertex IDs in the graph correspond to
         vertex IDs from the WeightedVertexSet."""
         self.graph.clear_edges()
-        edges = self.edge_generator(self.vertex_set, rng)
+        edges = self.edge_gen(self.vertex_set, rng)
         self.graph.add_edge_list(edges)
 
     def sample_edge_costs(self, rng: np.random.Generator) -> None:
@@ -86,7 +86,7 @@ class SIEpidemic:
         for edge in self.graph.edges():
             u_id = self.graph.vertex_index[edge.source()]
             v_id = self.graph.vertex_index[edge.target()]
-            new_cost = self.edge_cost_generator(rng)
+            new_cost = self.edge_cost_gen(rng)
             new_cost *= self.vertex_set.penalty(u_id, v_id, mu=self.mu, zeta=self.zeta)
             self.edge_costs[edge] = new_cost
 
@@ -195,8 +195,8 @@ class SIEpidemic:
         """Logs only the data needed to re-run the current epidemic to the given folder, with filenames depending
         on run_index. This is often significantly more space-efficient and faster."""
         with open(folder / self.config_filename, "wb") as file:
-            dill.dump(self.edge_generator, file, protocol=dill.HIGHEST_PROTOCOL)
-            dill.dump(self.edge_cost_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.edge_gen, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.edge_cost_gen, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.mu, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.zeta, file, protocol=dill.HIGHEST_PROTOCOL)
         self.vertex_set.save_configuration(folder / self.vertex_config_filename)
@@ -215,13 +215,13 @@ class SIEpidemic:
     def _empty_epidemic(name: str) -> SIEpidemic:
         """Creates an empty SIEpidemic object which can be initialised manually. Used when loading from files."""
         vertex_gen = Lattice(size=1, dimension=1)
-        weight_gen = FixedWeightGenerator(weights={0: 1}, description="Empty epidemic")
-        weighted_vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen,
+        weight_gen = FixedWeightGen(weights={0: 1}, description="Empty epidemic")
+        weighted_vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen,
                                               rng=np.random.default_rng())
-        edge_gen = FixedGraphGenerator(edges=[], description="Empty graph")
-        cost_gen = ConstantCostGenerator(c=0)
-        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen, mu=0.,
-                          zeta=0., name=name, rng=np.random.default_rng())
+        edge_gen = FixedGraphGen(edges=[], description="Empty graph")
+        cost_gen = ConstantCostGen(c=0)
+        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_gen=cost_gen, edge_gen=edge_gen, mu=0., zeta=0.,
+                          name=name, rng=np.random.default_rng())
 
     @classmethod
     def load_from_config(cls, folder: Path, name: str, rng: np.random.Generator) -> "SIEpidemic":
@@ -232,8 +232,8 @@ class SIEpidemic:
 
         try:
             with open(folder / return_value.config_filename, "rb") as file:
-                return_value.edge_generator = dill.load(file)
-                return_value.edge_cost_generator = dill.load(file)
+                return_value.edge_gen = dill.load(file)
+                return_value.edge_cost_gen = dill.load(file)
                 return_value.mu = dill.load(file)
                 return_value.zeta = dill.load(file)
         except Exception:
@@ -257,8 +257,8 @@ class SIEpidemic:
 
         try:
             with open(folder / return_value.config_filename, "rb") as file:
-                return_value.edge_generator = dill.load(file)
-                return_value.edge_cost_generator = dill.load(file)
+                return_value.edge_gen = dill.load(file)
+                return_value.edge_cost_gen = dill.load(file)
                 return_value.mu = dill.load(file)
                 return_value.zeta = dill.load(file)
         except Exception:
@@ -292,7 +292,7 @@ class SIEpidemic:
         return return_value
 
 
-class GirgGenerator(EdgeGenerator):
+class GirgGen(EdgeGen):
     """Generates an SIEpidemic whose graph is a GIRG on the given vertex_set with the given long-range parameter
     alpha and the given RNG seed. The connection probability between u and v is max(1, W_uW_v/|u-v|^d)^\alpha. If
     average_degree is set then the GIRG library uses binary search to find a constant c to scale the weights by which
@@ -332,7 +332,7 @@ class GirgGenerator(EdgeGenerator):
         self.average_degree = average_degree
 
 
-class FixedGraphGenerator(EdgeGenerator):
+class FixedGraphGen(EdgeGen):
     """'Edge generator' for a constant graph such as the Gowalla dataset, to be passed to SIEpidemic. The edges
     should be specified as a list of pairs of vertex IDs."""
     def __init__(self, edges: Sequence[Tuple[int, int]], description: str) -> None:
@@ -340,7 +340,7 @@ class FixedGraphGenerator(EdgeGenerator):
         self._function = lambda _, __: edges
 
 
-class FPPCostGenerator(EdgeCostGenerator):
+class FPPCostGen(EdgeCostGen):
     """Edge cost generator for first passage percolation (i.e. the random part of edge costs are i.i.d. exponentially
     distributed) with the given parameter."""
     def __init__(self, lambda_: float) -> None:
@@ -348,7 +348,7 @@ class FPPCostGenerator(EdgeCostGenerator):
         self._function = lambda rng: rng.exponential(scale=lambda_)
 
 
-class ConstantCostGenerator(EdgeCostGenerator):
+class ConstantCostGen(EdgeCostGen):
     """Edge cost generator for testing purposes that sets the random part of all edge costs to the given constant."""
     def __init__(self, c: float) -> None:
         self.c = c

@@ -163,13 +163,13 @@ class EarthDistance(Metric):
         self._function = lambda x, y: haversine.haversine(x, y)
 
 
-class VertexSetGenerator(LoggableFunction[[np.random.Generator], VertexSet]):
+class VertexSetGen(LoggableFunction[[np.random.Generator], VertexSet]):
     @property
     def function_role(self) -> str:
         return "Vertex set generator"
 
 
-class FixedVertexSet(VertexSetGenerator):
+class FixedVertexSet(VertexSetGen):
     """Returns a fixed vertex set with the given metric and with dimension inferred from the given map of vertex IDs to
     positions in space."""
     def __init__(self, points: Mapping[Any, Sequence[float]], metric: Metric, description: str):
@@ -188,7 +188,7 @@ class FixedVertexSet(VertexSetGenerator):
         self._function = _function
 
 
-class Lattice(VertexSetGenerator):
+class Lattice(VertexSetGen):
     """Returns a VertexSet for the integer lattice spanning [0, size]^dimension under Euclidean distance."""
     def __init__(self, dimension: int, size: int):
         def _function(_):
@@ -207,7 +207,7 @@ class Lattice(VertexSetGenerator):
         self._function = _function
 
 
-class PoissonPointProcess(VertexSetGenerator):
+class PoissonPointProcess(VertexSetGen):
     """Returns a VertexSet for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
     def __init__(self, dimension: int, size: float):

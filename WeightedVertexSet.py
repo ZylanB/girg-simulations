@@ -1,4 +1,4 @@
-from VertexSet import VertexSet, VertexSetGenerator
+from VertexSet import VertexSet, VertexSetGen
 from typing import Any, Mapping, Optional, List, Sequence
 import girg_sampling.girgs as gs  # type: ignore
 import numpy as np
@@ -8,14 +8,14 @@ from pathlib import Path
 import dill  # type: ignore
 
 
-class WeightGenerator(LoggableFunction[[VertexSet, np.random.Generator], Sequence[float]]):
+class WeightGen(LoggableFunction[[VertexSet, np.random.Generator], Sequence[float]]):
     """Function to generate a list of weights for the given vertex set."""
     @property
     def function_role(self):
         return "Vertex weight generator"
 
 
-class GenericWeightGenerator(WeightGenerator):
+class GenericWeightGen(WeightGen):
     """Lightweight option to just pass in the function you care about with a description for logging."""
     def __init__(self, _function, description: str):
         self.description = description
@@ -23,14 +23,13 @@ class GenericWeightGenerator(WeightGenerator):
 
 
 class WeightedVertexSet:
-    def __init__(self, vertex_generator: VertexSetGenerator, weight_generator: WeightGenerator,
-                 rng: np.random.Generator):
+    def __init__(self, vertex_gen: VertexSetGen, weight_gen: WeightGen, rng: np.random.Generator):
         """Stores a vertex set for a GIRG with both spatial and weight data. Vertices should be the underlying vertex
-        set. Weight_generator should be a function that (probably randomly) resamples weights for the given
+        set. Weight_gen should be a function that (probably randomly) resamples weights for the given
         VertexSet, returning a dictionary from vertex IDs to weights."""
-        self.vertex_generator = vertex_generator
-        self.vertices = self.vertex_generator(rng)
-        self.weight_generator = weight_generator
+        self.vertex_gen = vertex_gen
+        self.vertices = self.vertex_gen(rng)
+        self.weight_gen = weight_gen
         self.weights: Sequence[float] = []
         self.resample_weights(rng)
 
@@ -44,12 +43,12 @@ class WeightedVertexSet:
         return self.weights[id_]
 
     def resample_weights(self, rng: np.random.Generator) -> None:
-        """Resamples the vertex weights from the given generator function."""
-        self.weights = self.weight_generator(self.vertices, rng)
+        """Resamples the vertex weights from the given WeightGen function."""
+        self.weights = self.weight_gen(self.vertices, rng)
 
     def resample_vertices(self, rng: np.random.Generator):
-        """Resamples the whole vertex set, including the weights, from the given generator functions."""
-        self.vertices = self.vertex_generator(rng)
+        """Resamples the whole vertex set, including the weights, from the given VertexGen and WeightGen functions."""
+        self.vertices = self.vertex_gen(rng)
         self.resample_weights(rng)
 
     def penalty(self, x_id: int, y_id: int, mu: float, zeta: float) -> float:
@@ -61,8 +60,8 @@ class WeightedVertexSet:
     def save_configuration(self, path: Path) -> None:
         """Save the generator functions to file; this is often much smaller than the full vertex set."""
         with open(path, "wb") as file:
-            dill.dump(self.weight_generator, file, protocol=dill.HIGHEST_PROTOCOL)
-            dill.dump(self.vertex_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.weight_gen, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.vertex_gen, file, protocol=dill.HIGHEST_PROTOCOL)
 
     @classmethod
     def load_from_configuration(cls, path: Path, rng: np.random.Generator) -> "WeightedVertexSet":
@@ -73,7 +72,7 @@ class WeightedVertexSet:
         except Exception:
             print("Could not load WeightedVertexSet configuration file.")
             raise
-        return WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, rng=rng)
+        return WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
 
 
 class EdgeWeightScaler(LoggableFunction[[float, np.random.Generator], float]):
@@ -97,7 +96,7 @@ class GenericEdgeWeightScaler(EdgeWeightScaler):
         self.description = description
 
 
-class PowerLawWeightGenerator(WeightGenerator):
+class PowerLawWeightGen(WeightGen):
     """Returns a weight sampling function for WeightedVertexSet which samples weights W i.i.d. from a power law, taking
     Pr(W >= x) = ell(x) / x^{\tau - 1} and using the specified RNG, then applies the given scaling map to each
     weight."""
@@ -126,7 +125,7 @@ class PowerLawWeightGenerator(WeightGenerator):
         return weights
 
 
-class FixedWeightGenerator(WeightGenerator):
+class FixedWeightGen(WeightGen):
     def __init__(self, weights: Mapping[Any, float], description: str) -> None:
         """Takes a dictionary mapping vertex names to weights, and returns a constant weight 'sampling function' which
         just returns a list mapping each vertex ID to its weight."""
@@ -134,7 +133,7 @@ class FixedWeightGenerator(WeightGenerator):
         self._function = lambda vertices, _: [weights[vertices.id_to_name(i)] for i in range(len(weights))]
 
 
-def create_from_degrees_generator(degrees: Mapping[Any, int], description: str) -> FixedWeightGenerator:
+def create_from_degrees_gen(degrees: Mapping[Any, int], description: str) -> FixedWeightGen:
     r"""Returns a weight sampling function for WeightedVertexSet which 'samples' weights by estimating them based on
     a supplied dictionary mapping vertex names to vertex degrees in the base graph. Used for the Gowalla dataset.
 
@@ -162,4 +161,4 @@ def create_from_degrees_generator(degrees: Mapping[Any, int], description: str) 
         return max(1., degrees[name] - penalty)
 
     weights = {name: weight_estimate(name) for name in degrees.keys()}
-    return FixedWeightGenerator(weights, description)
+    return FixedWeightGen(weights, description)

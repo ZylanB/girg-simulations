@@ -1,18 +1,18 @@
 import unittest
 import textwrap
 from SIExperiment import *
-from SIEpidemic import SIEpidemic, GenericEdgeCostGenerator, GenericEdgeGenerator
+from SIEpidemic import SIEpidemic, GenericEdgeCostGen, GenericEdgeGen
 from VertexSet import Lattice
-from WeightedVertexSet import WeightedVertexSet, GenericWeightGenerator
+from WeightedVertexSet import WeightedVertexSet, GenericWeightGen
 
 
-def _dummy_weight_generator(_, __):
-    _dummy_weight_generator.x += 1
-    return [_dummy_weight_generator.x, _dummy_weight_generator.x + .25, _dummy_weight_generator.x + .5,
-            _dummy_weight_generator.x + .75]
+def _dummy_weight_gen(_, __):
+    _dummy_weight_gen.x += 1
+    return [_dummy_weight_gen.x, _dummy_weight_gen.x + .25, _dummy_weight_gen.x + .5,
+            _dummy_weight_gen.x + .75]
 
 
-_dummy_weight_generator.x = -1  # type: ignore
+_dummy_weight_gen.x = -1  # type: ignore
 
 _graphs = [[],
            [(0, 1)],
@@ -23,26 +23,26 @@ _graphs = [[],
            [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]]
 
 
-def _dummy_edge_generator(_, __):
-    _dummy_edge_generator.x += 1
-    return _graphs[_dummy_edge_generator.x]
+def _dummy_edge_gen(_, __):
+    _dummy_edge_gen.x += 1
+    return _graphs[_dummy_edge_gen.x]
 
 
-_dummy_edge_generator.x = -1  # type: ignore
+_dummy_edge_gen.x = -1  # type: ignore
 
 
-def _dummy_cost_generator(_):
-    _dummy_cost_generator.x += 1
-    return _dummy_cost_generator.x
+def _dummy_cost_gen(_):
+    _dummy_cost_gen.x += 1
+    return _dummy_cost_gen.x
 
 
-_dummy_cost_generator.x = -1  # type: ignore
+_dummy_cost_gen.x = -1  # type: ignore
 
 
-def _reset_generator_globals() -> None:
-    _dummy_edge_generator.x = -1  # type: ignore
-    _dummy_weight_generator.x = -1  # type: ignore
-    _dummy_cost_generator.x = -1  # type: ignore
+def _reset_gen_globals() -> None:
+    _dummy_edge_gen.x = -1  # type: ignore
+    _dummy_weight_gen.x = -1  # type: ignore
+    _dummy_cost_gen.x = -1  # type: ignore
 
 
 class FileIOTests(unittest.TestCase):
@@ -54,16 +54,16 @@ class FileIOTests(unittest.TestCase):
         self.entropy = 99217604857427484066604220485342406204
         self.rng = np.random.default_rng(seed=self.entropy)
 
-        _reset_generator_globals()
+        _reset_gen_globals()
 
-        weight_generator = GenericWeightGenerator(_dummy_weight_generator, "Test weight generator")
-        edge_generator = GenericEdgeGenerator(_dummy_edge_generator, "Test edge generator")
-        cost_generator = GenericEdgeCostGenerator(_dummy_cost_generator, "Test cost generator")
+        weight_gen = GenericWeightGen(_dummy_weight_gen, "Test weight generator")
+        edge_gen = GenericEdgeGen(_dummy_edge_gen, "Test edge generator")
+        cost_gen = GenericEdgeCostGen(_dummy_cost_gen, "Test cost generator")
 
-        vertex_generator = Lattice(dimension=2, size=2)
-        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator, rng=self.rng)
-        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator, rng=self.rng,
-                                   edge_generator=edge_generator, mu=0.5, zeta=1.5, name="test")
+        vertex_gen = Lattice(dimension=2, size=2)
+        vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=self.rng)
+        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_gen=cost_gen, rng=self.rng,
+                                   edge_gen=edge_gen, mu=0.5, zeta=1.5, name="test")
 
         self.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
         self.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
@@ -146,7 +146,7 @@ class FileIOTests(unittest.TestCase):
         experiment.save_config()
         experiment.execute()
 
-        _reset_generator_globals()
+        _reset_gen_globals()
         loaded_experiment = SIExperiment.load_from_file(folder=self.log_path, name="test", rerun=True,
                                                         use_old_seed=True)
         loaded_experiment.execute()
@@ -184,11 +184,11 @@ class FileIOTests(unittest.TestCase):
             \tdescription==Zero vertex
             Test result extractor of type <class 'SIExperiment.GenericResultFunction'>:
             \tdescription==Edge count
-            Edge cost generator of type <class 'SIEpidemic.GenericEdgeCostGenerator'>:
+            Edge cost generator of type <class 'SIEpidemic.GenericEdgeCostGen'>:
             \tdescription==Test cost generator
-            Edge set generator of type <class 'SIEpidemic.GenericEdgeGenerator'>:
+            Edge set generator of type <class 'SIEpidemic.GenericEdgeGen'>:
             \tdescription==Test edge generator
-            Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGenerator'>:
+            Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGen'>:
             \tdescription==Test weight generator
             Distance function on vertex set of type <class 'VertexSet.TorusDistance'>:
             \tdimension==2
@@ -196,7 +196,7 @@ class FileIOTests(unittest.TestCase):
             Vertex set generator of type <class 'VertexSet.Lattice'>:
             \tsize==2
             \tdimension==2
-            Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGenerator'>:
+            Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGen'>:
             \tdescription==Test weight generator
             """)
         self.assertEqual(saved_settings, expected_cfg)

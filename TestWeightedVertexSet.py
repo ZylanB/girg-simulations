@@ -9,11 +9,11 @@ from math import floor
 class BasicTests(unittest.TestCase):
     def setUp(self):
         self.weights = {1: 1., 2: 2.5, "abc": 3.}
-        self.weight_gen = FixedWeightGenerator(self.weights, "Test generator")
+        self.weight_gen = FixedWeightGen(self.weights, "Test generator")
         points = {1: (0, 0), 2: (2, 0), "abc": (2, 2)}
         self.vertex_gen = FixedVertexSet(metric=EuclideanDistance(d=2), points=points, description="Test")
-        self.vertices = WeightedVertexSet(vertex_generator=self.vertex_gen, weight_generator=self.weight_gen,
-                                          rng=np.random.default_rng())
+        rng = np.random.default_rng()
+        self.vertices = WeightedVertexSet(vertex_gen=self.vertex_gen, weight_gen=self.weight_gen, rng=rng)
 
         self.id_1 = self.vertices.name_to_id(1)
         self.id_2 = self.vertices.name_to_id(2)
@@ -49,11 +49,11 @@ class BasicTests(unittest.TestCase):
         entropy = 331375102187953107209086426124205679010
         rng = np.random.default_rng(seed=entropy)
 
-        def weight_generator_fn(vertices: VertexSet, gen: np.random.Generator) -> List[float]:
+        def weight_gen_fn(vertices: VertexSet, gen: np.random.Generator) -> List[float]:
             return [gen.random() for _ in vertices.names]
-        weight_generator = GenericWeightGenerator(_function=weight_generator_fn, description="Test weight generator")
+        weight_gen = GenericWeightGen(_function=weight_gen_fn, description="Test weight generator")
 
-        data = WeightedVertexSet(self.vertex_gen, weight_generator, rng)
+        data = WeightedVertexSet(self.vertex_gen, weight_gen, rng)
         first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
         data.resample_weights(rng)
         second_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
@@ -66,12 +66,12 @@ class BasicTests(unittest.TestCase):
 class TestFromDegrees(unittest.TestCase):
     def test_from_degrees(self):
         degrees = {1: 40, 2: 20, "abc": 60, "def": 0}  # Average degree 30, penalty should be 20.
-        weight_generator = create_from_degrees_generator(degrees, "Test generator")
+        weight_gen = create_from_degrees_gen(degrees, "Test generator")
 
         vertices = VertexSet(dimension=2, metric=EuclideanDistance(d=2))
         points = {1: (0, 0), 2: (1, 1), "abc": (2, 2), "def": (3, 3)}
         vertices.set_points_from_names(points)
-        output = weight_generator(vertices, np.random.default_rng())
+        output = weight_gen(vertices, np.random.default_rng())
 
         id_1 = vertices.name_to_id(1)
         self.assertEqual(20., output[id_1])
@@ -93,12 +93,12 @@ class TestPowerLaw(unittest.TestCase):
 
         scaling = GenericEdgeWeightScaler(_function=lambda w, _: 2*w, description="Test scaler")
         tau = 2.5
-        weight_generator = PowerLawWeightGenerator(tau=tau, ell=scaling)
+        weight_gen = PowerLawWeightGen(tau=tau, ell=scaling)
 
         n = 100000
         point_dict = {i: (i,) for i in range(n)}
         vertex_gen = FixedVertexSet(metric=EuclideanDistance(d=1), points=point_dict, description="Test")
-        test_instance = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_generator, rng=rng)
+        test_instance = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
 
         weight_counts = defaultdict(lambda: 0)
         for i in test_instance.vertices.names:

@@ -212,12 +212,12 @@ class SIExperiment:
         lines.extend(self.initial_vertex_fn.log_lines)
         lines.extend(self.result_fn.log_lines)
         if self.epidemic is not None:
-            lines.extend(self.epidemic.edge_cost_generator.log_lines)
-            lines.extend(self.epidemic.edge_generator.log_lines)
-            lines.extend(self.epidemic.vertex_set.weight_generator.log_lines)
+            lines.extend(self.epidemic.edge_cost_gen.log_lines)
+            lines.extend(self.epidemic.edge_gen.log_lines)
+            lines.extend(self.epidemic.vertex_set.weight_gen.log_lines)
             lines.extend(self.epidemic.vertex_set.metric.log_lines)
-            lines.extend(self.epidemic.vertex_set.vertex_generator.log_lines)
-            lines.extend(self.epidemic.vertex_set.weight_generator.log_lines)
+            lines.extend(self.epidemic.vertex_set.vertex_gen.log_lines)
+            lines.extend(self.epidemic.vertex_set.weight_gen.log_lines)
 
         byte_lines = [line.encode("utf-8") for line in lines]
         with open(self.log_path / self.settings_name, "wb") as file:

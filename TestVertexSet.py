@@ -165,9 +165,9 @@ class TestPPP(unittest.TestCase):
         big_point_counts = defaultdict(lambda: 0)
         small_point_counts = defaultdict(lambda: 0)
 
-        instance_generator = PoissonPointProcess(dimension=2, size=10.)
+        instance_gen = PoissonPointProcess(dimension=2, size=10.)
         for i in range(100000):
-            instance = instance_generator(rng)
+            instance = instance_gen(rng)
 
             # Lower-left corners for each square
             big_corner = rng.uniform(low=0., high=5., size=2)

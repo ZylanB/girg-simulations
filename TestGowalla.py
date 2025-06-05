@@ -2,7 +2,7 @@ import unittest
 
 import graph_tool.topology  # type: ignore
 from Gowalla import *
-from SIEpidemic import GenericEdgeCostGenerator
+from SIEpidemic import GenericEdgeCostGen
 
 from TestDistribution import dkw_p_value
 
@@ -126,8 +126,8 @@ class GenerationTests(unittest.TestCase):
 
     def test_save_load(self):
         self.instance.save_files()
-        edge_cost_generator = GenericEdgeCostGenerator(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test",
+        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng())
 
         original_vertices = self.instance.vertices
@@ -152,8 +152,8 @@ class GenerationTests(unittest.TestCase):
 class GraphTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        edge_cost_generator = GenericEdgeCostGenerator(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test",
+        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng())
         cls.vertex_set = test_epidemic.vertex_set
         cls.graph = test_epidemic.graph
