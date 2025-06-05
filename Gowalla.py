@@ -59,11 +59,10 @@ class GowallaDataReader:
     _VERTEX_DATA_PATH = Path.cwd() / "Gowalla_totalCheckins.txt"
     _EDGE_DATA_PATH = Path.cwd() / "Gowalla_edges.txt"
 
-    def __init__(self, vertex_path: Optional[Path] = None, edge_path: Optional[Path] = None,
-                 generator: Optional[np.random.Generator] = None):
+    def __init__(self, rng: np.random.Generator, vertex_path: Optional[Path] = None, edge_path: Optional[Path] = None):
         self.vertex_path = vertex_path
         self.edge_path = edge_path
-        self.generator = np.random.default_rng() if generator is None else generator
+        self.rng = rng
 
         if not self._snap_data_present():
             self._obtain_snap_data()
@@ -163,7 +162,8 @@ class GowallaDataReader:
         vertex_generator = FixedVertexSet(metric=EarthDistance(), points=ids_to_positions,
                                           description="Gowalla dataset")
         weight_generator = create_from_degrees_generator(degree_dict, description="Gowalla dataset")
-        weighted_vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
+        weighted_vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator,
+                                              rng=self.rng)
 
         return weighted_vertices, ties
 
@@ -196,10 +196,10 @@ class GowallaDataReader:
             tie_datum = None
         else:
             tie_datum = TieDatum(user_id=user_id, modal_positions=modal_disc_positions)
-        disc_position_index = self.generator.integers(0, len(modal_disc_positions))
+        disc_position_index = self.rng.integers(0, len(modal_disc_positions))
         disc_positions = modal_disc_positions[disc_position_index]
 
-        position_index = self.generator.integers(0, len(position_dict[disc_positions]))
+        position_index = self.rng.integers(0, len(position_dict[disc_positions]))
         return position_dict[disc_positions][position_index], tie_datum
 
     @staticmethod
@@ -242,16 +242,17 @@ class GowallaSIEpidemic(SIEpidemic):
     _SAVED_EDGE_PATH = Path.cwd() / "gowalla_edges.pickle"
 
     def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float, name: str,
-                 generator: Optional[np.random.Generator] = None):
+                 rng: np.random.Generator):
         if not self._saved_graph_present():
             print("Gowalla data not present. Recreating...")
-            data_reader = GowallaDataReader(vertex_path=self._SAVED_VERTEX_PATH, edge_path=self._SAVED_EDGE_PATH)
+            data_reader = GowallaDataReader(vertex_path=self._SAVED_VERTEX_PATH, edge_path=self._SAVED_EDGE_PATH,
+                                            rng=rng)
             data_reader.save_files()
 
         vertex_set = self._load_vertices(mu, zeta)
         edge_generator = self._load_edges()
         super().__init__(vertex_set=vertex_set, edge_cost_generator=edge_cost_generator, edge_generator=edge_generator,
-                         mu=mu, zeta=zeta, generator=generator, name=name)
+                         mu=mu, zeta=zeta, rng=rng, name=name)
 
     @classmethod
     def _saved_graph_present(cls):

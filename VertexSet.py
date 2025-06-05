@@ -3,7 +3,7 @@ import haversine  # type: ignore
 import functools
 import itertools
 import numpy as np
-from typing import Any, Dict, List, Optional, Mapping, Set, Sequence
+from typing import Any, Dict, List, Mapping, Set, Sequence
 from dataclasses import dataclass
 from LoggableFunction import LoggableFunction
 
@@ -168,11 +168,6 @@ class VertexSetGenerator(LoggableFunction[[np.random.Generator], VertexSet]):
     def function_role(self) -> str:
         return "Vertex set generator"
 
-    def __call__(self, generator: Optional[np.random.Generator] = None) -> VertexSet:
-        if generator is None:
-            generator = np.random.default_rng()
-        return super().__call__(generator)
-
 
 class FixedVertexSet(VertexSetGenerator):
     """Returns a fixed vertex set with the given metric and with dimension inferred from the given map of vertex IDs to
@@ -216,12 +211,12 @@ class PoissonPointProcess(VertexSetGenerator):
     """Returns a VertexSet for a Poisson point process of density 1 in [0, size]^dimension using the specified RNG,
     with a planted point in the center and using torus distance."""
     def __init__(self, dimension: int, size: float):
-        def _function(generator: np.random.Generator) -> VertexSet:
+        def _function(rng: np.random.Generator) -> VertexSet:
             # We simulate a PPP by choosing Po(size^dimension) points independently and uniformly at random.
-            point_count = generator.poisson(size ** dimension)
+            point_count = rng.poisson(size ** dimension)
             points = []
             for i in range(point_count):
-                next_point_coordinates = tuple(generator.uniform(low=0., high=size, size=dimension))
+                next_point_coordinates = tuple(rng.uniform(low=0., high=size, size=dimension))
                 points.append(next_point_coordinates)
 
             vertex_set = VertexSet(dimension=dimension, metric=TorusDistance(dimension, size))

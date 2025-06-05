@@ -22,7 +22,8 @@ class BasicTests(unittest.TestCase):
         vertex_generator = FixedVertexSet(points=point_dict, metric=EuclideanDistance(d=self.d), description="test")
         self.weights = {"a": 2., "b": 3., "c": 5., "d": 7., "e": 11., "f": 13.}
         weight_generator = FixedWeightGenerator(weights=self.weights, description="Test weights")
-        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator,
+                                     rng=np.random.default_rng())
 
         self.a_id = vertices.name_to_id("a")
         self.b_id = vertices.name_to_id("b")
@@ -36,11 +37,13 @@ class BasicTests(unittest.TestCase):
         edge_generator = FixedGraphGenerator(edges=self.edges, description="Test graph")
 
         self.unpenalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator, name="test",
-                                               edge_cost_generator=ConstantCostGenerator(1.), mu=0., zeta=0.)
+                                               edge_cost_generator=ConstantCostGenerator(1.), mu=0., zeta=0.,
+                                               rng=np.random.default_rng())
         self.unpenalised_epidemic.run_infection(self.a_id)
 
         self.penalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator, name="test",
-                                             edge_cost_generator=ConstantCostGenerator(1.), mu=self.mu, zeta=self.zeta)
+                                             edge_cost_generator=ConstantCostGenerator(1.), mu=self.mu, zeta=self.zeta,
+                                             rng=np.random.default_rng())
         self.penalised_epidemic.run_infection(self.a_id)
 
     def test_unpenalised_properties(self):
@@ -140,22 +143,22 @@ class BasicTests(unittest.TestCase):
 
 class EdgeCostTests(unittest.TestCase):
     def test_constant_cost(self):
-        generator = ConstantCostGenerator(1.)
+        cost_generator = ConstantCostGenerator(1.)
         for _ in range(10):
-            self.assertEqual(generator(), 1.0)
+            self.assertEqual(cost_generator(np.random.default_rng()), 1.0)
 
-        generator = ConstantCostGenerator(1.5)
+        cost_generator = ConstantCostGenerator(1.5)
         for _ in range(10):
-            self.assertEqual(generator(), 1.5)
+            self.assertEqual(cost_generator(np.random.default_rng()), 1.5)
 
     def test_fpp_cost(self):
         entropy = 252869566619441809084118758734182862550  # Generated from numpy via SeedSequence().entropy
-        generator = np.random.default_rng(seed=entropy)
+        rng = np.random.default_rng(seed=entropy)
         lambda_ = 1
         cost_generator = FPPCostGenerator(lambda_=lambda_)
 
         n = 100000
-        costs = [cost_generator(generator) for _ in range(n)]
+        costs = [cost_generator(rng) for _ in range(n)]
 
         # Split into buckets
         bucket_width = 0.3
@@ -186,18 +189,18 @@ class GIRGTests(unittest.TestCase):
         """Generate 4-vertex 1-d GIRGs. All but two edges are present with certainty; check that these are always
         present and that the other two are present independently with the right connection probabilities."""
         entropy = 99587849537254950220960273702174246406  # Generated from numpy via SeedSequence().entropy
-        generator = np.random.default_rng(seed=entropy)
+        rng = np.random.default_rng(seed=entropy)
 
         point_dict = {0: (0.,), 1: (1.,), 2: (2.,), 3: (3.,)}
         vertex_generator = FixedVertexSet(metric=TorusDistance(d=1, size=4), points=point_dict, description="test")
 
         weights = {0: 1.1, 1: 1.2, 2: 1.3, 3: 1.4}
         weight_gen = FixedWeightGenerator(weights, description="Test weights")
-        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_gen)
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_gen, rng=rng)
 
         graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=.25)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator, name="test")
+                              edge_generator=graph_gen, mu=0., zeta=0., rng=rng, name="test")
 
         vertex_a = epidemic.graph.vertex(0)
         vertex_b = epidemic.graph.vertex(1)
@@ -218,7 +221,7 @@ class GIRGTests(unittest.TestCase):
         for i in range(100000):
             if i % 10000 == 0:
                 print(f"Test run {i//1000}k/100k")
-            epidemic.sample_edges(generator)
+            epidemic.sample_edges(rng)
 
             # Even though the graph is undirected, edges are still stored as tuples.
             guaranteed_edges = [(vertex_a, vertex_b), (vertex_b, vertex_c), (vertex_c, vertex_d), (vertex_d, vertex_a)]
@@ -247,18 +250,18 @@ class GIRGTests(unittest.TestCase):
         """Generate 9-vertex 2-d GIRGs with unit weights. Check that all edges that should be present are present,
         and that the total number of edges has the correct distribution."""
         entropy = 257965182494033889699734564010582594886  # Generated from numpy via SeedSequence().entropy
-        generator = np.random.default_rng(seed=entropy)
+        rng = np.random.default_rng(seed=entropy)
 
         point_dict = {0: (0., 0.), 1: (1., 0.), 2: (2., 0.), 3: (0., 1.), 4: (1., 1.), 5: (2., 1.), 6: (0., 2.),
                       7: (1., 2.), 8: (2., 2.)}
         vertex_gen = FixedVertexSet(points=point_dict, description="test", metric=TorusDistance(d=2, size=3))
         weights = {0: 1., 1: 1., 2: 1., 3: 1., 4: 1., 5: 1., 6: 1., 7: 1., 8: 1.}
         weight_gen = FixedWeightGenerator(weights, description="Test weights")
-        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
+        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, rng=rng)
 
         graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=1/3)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0., name="test", generator=generator)
+                              edge_generator=graph_gen, mu=0., zeta=0., name="test", rng=rng)
 
         vertex_a = epidemic.graph.vertex(0)
         vertex_b = epidemic.graph.vertex(1)
@@ -284,7 +287,7 @@ class GIRGTests(unittest.TestCase):
         for i in range(100000):
             if i % 10000 == 0:
                 print(f"Test run {i // 1000}k/100k")
-            epidemic.sample_edges(generator)
+            epidemic.sample_edges(rng)
 
             # Even though the graph is undirected, edges are still stored as tuples.
             guaranteed_edges = [(vertex_a, vertex_b), (vertex_a, vertex_c), (vertex_a, vertex_d), (vertex_a, vertex_g),
@@ -326,22 +329,22 @@ class FileIOTests(unittest.TestCase):
 
     def testDeterministic(self):
         entropy = 252869566619441809084118758734182862550
-        generator = np.random.default_rng(seed=entropy)
-        self.helper(generator)
+        rng = np.random.default_rng(seed=entropy)
+        self.helper(rng)
 
     def testRandom(self):
-        generator = np.random.default_rng()
-        self.helper(generator)
+        rng = np.random.default_rng()
+        self.helper(rng)
 
-    def helper(self, generator: np.random.Generator):
+    def helper(self, rng: np.random.Generator):
         """Run a quick infection on 10k vertices, save it, load it, and check the two runs are equal."""
         vertex_gen = Lattice(dimension=2, size=100)
         weight_gen = PowerLawWeightGenerator(tau=3, ell=IdentityWeightScaler())
-        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
+        vertices = WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, rng=rng)
         cost_gen = FPPCostGenerator(lambda_=1.)
         edge_gen = GirgGenerator(alpha=1.8, scale_factor=1/100)
         saved_value = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen,
-                                 mu=1., zeta=0.5, generator=generator, name="test")
+                                 mu=1., zeta=0.5, rng=rng, name="test")
         saved_value.run_infection(np.random.randint(10000))
 
         saved_value.save_vertices(self.log_path, 2)

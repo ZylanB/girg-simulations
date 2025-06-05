@@ -53,7 +53,7 @@ class SIExperiment:
             log_path, but with -run-[number] appended to the end of the file.
         result_fn: A function to pull the (possibly random) parameters of interest each run from the SIEpidemic.
         seed: The RNG seed for the current iteration.
-        generator: The numpy RNG to use for all random events.
+        rng: The numpy RNG to use for all random events.
         results: The results of the experiment, stored as a numbered list.
     """
     def __init__(self, epidemic: Optional[SIEpidemic], run_count: int, resample_edges: bool, resample_costs: bool,
@@ -72,7 +72,7 @@ class SIExperiment:
         self.full_log = full_log
         self.result_fn = result_fn
         self.seed = seed if seed else np.random.SeedSequence().entropy
-        self.generator = np.random.default_rng(self.seed)
+        self.rng = np.random.default_rng(self.seed)
         self.results: List[Any] = []
         self._current_run = 0
 
@@ -86,21 +86,21 @@ class SIExperiment:
             raise RuntimeError("Attempting to run experiment with an undefined epidemic.")
 
         if self.resample_vertices and not first_run:
-            self.epidemic.vertex_set.resample_vertices(self.generator)
+            self.epidemic.vertex_set.resample_vertices(self.rng)
         if self.resample_weights and not self.resample_vertices and not first_run:
-            self.epidemic.vertex_set.resample_weights(self.generator)
+            self.epidemic.vertex_set.resample_weights(self.rng)
         if self.resample_edges and not first_run:
-            self.epidemic.sample_edges(self.generator)
+            self.epidemic.sample_edges(self.rng)
         if self.resample_costs and not first_run:
-            self.epidemic.sample_edge_costs(self.generator)
-        self.epidemic.run_infection(initial_vertex_id=self.initial_vertex_fn(self.generator))
-        self.results.append(self.result_fn(self.epidemic.graph, self.generator))
+            self.epidemic.sample_edge_costs(self.rng)
+        self.epidemic.run_infection(initial_vertex_id=self.initial_vertex_fn(self.rng))
+        self.results.append(self.result_fn(self.epidemic.graph, self.rng))
         if self.full_log:
             self._log_run()
 
     def execute(self) -> List[Any]:
         """Carries out the entire experiment, logging everything necessary to file and self.results (and also returning
-        it for convenience). Resets the seed and generator afterwards if reset_seed is True."""
+        it for convenience)."""
         if not self.epidemic:
             raise Exception("Trying to run an experiment without an epidemic.")
 
@@ -250,7 +250,7 @@ class SIExperiment:
                 check_valid(line, field)
                 setattr(self, field, extract_value(line))
 
-        self.generator = np.random.default_rng(self.seed)
+        self.rng = np.random.default_rng(self.seed)
 
     @property
     def functions_name(self) -> str:
@@ -282,12 +282,12 @@ class SIExperiment:
         return_value.load_settings()
         if not use_old_seed:
             return_value.seed = np.random.SeedSequence().entropy
-            return_value.generator = np.random.default_rng(return_value.seed)
+            return_value.rng = np.random.default_rng(return_value.seed)
         return_value.load_functions()
 
         if rerun:
             return_value.epidemic = SIEpidemic.load_from_config(folder=return_value.log_path, name=return_value.name,
-                                                                generator=return_value.generator)
+                                                                rng=return_value.rng)
             return return_value
 
         if not return_value.results_exist:

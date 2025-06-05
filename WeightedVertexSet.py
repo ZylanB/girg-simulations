@@ -14,11 +14,6 @@ class WeightGenerator(LoggableFunction[[VertexSet, np.random.Generator], Sequenc
     def function_role(self):
         return "Vertex weight generator"
 
-    def __call__(self, vertex_set: VertexSet, generator: Optional[np.random.Generator] = None) -> Sequence[float]:
-        if generator is None:
-            generator = np.random.default_rng()
-        return super().__call__(vertex_set, generator)
-
 
 class GenericWeightGenerator(WeightGenerator):
     """Lightweight option to just pass in the function you care about with a description for logging."""
@@ -29,15 +24,15 @@ class GenericWeightGenerator(WeightGenerator):
 
 class WeightedVertexSet:
     def __init__(self, vertex_generator: VertexSetGenerator, weight_generator: WeightGenerator,
-                 generator: Optional[np.random.Generator] = None):
+                 rng: np.random.Generator):
         """Stores a vertex set for a GIRG with both spatial and weight data. Vertices should be the underlying vertex
         set. Weight_generator should be a function that (probably randomly) resamples weights for the given
         VertexSet, returning a dictionary from vertex IDs to weights."""
         self.vertex_generator = vertex_generator
-        self.vertices = self.vertex_generator(generator)
+        self.vertices = self.vertex_generator(rng)
         self.weight_generator = weight_generator
         self.weights: Sequence[float] = []
-        self.resample_weights(generator)
+        self.resample_weights(rng)
 
     def __getattr__(self, item):
         """Delegation, allows use of members and methods from VertexSet without formal inheritance."""
@@ -48,14 +43,14 @@ class WeightedVertexSet:
         """Returns the weight of the vertex with the given id."""
         return self.weights[id_]
 
-    def resample_weights(self, generator: Optional[np.random.Generator]) -> None:
+    def resample_weights(self, rng: np.random.Generator) -> None:
         """Resamples the vertex weights from the given generator function."""
-        self.weights = self.weight_generator(self.vertices, generator)
+        self.weights = self.weight_generator(self.vertices, rng)
 
-    def resample_vertices(self, generator: Optional[np.random.Generator]):
+    def resample_vertices(self, rng: np.random.Generator):
         """Resamples the whole vertex set, including the weights, from the given generator functions."""
-        self.vertices = self.vertex_generator(generator)
-        self.resample_weights(generator)
+        self.vertices = self.vertex_generator(rng)
+        self.resample_weights(rng)
 
     def penalty(self, x_id: int, y_id: int, mu: float, zeta: float) -> float:
         """Returns the total penalty for a possible edge (specified by vertex IDs), not including the random cost."""
@@ -70,7 +65,7 @@ class WeightedVertexSet:
             dill.dump(self.vertex_generator, file, protocol=dill.HIGHEST_PROTOCOL)
 
     @classmethod
-    def load_from_configuration(cls, path: Path, generator: Optional[np.random.Generator]) -> "WeightedVertexSet":
+    def load_from_configuration(cls, path: Path, rng: np.random.Generator) -> "WeightedVertexSet":
         try:
             with open(path, "rb") as file:
                 weight_gen = dill.load(file)
@@ -78,7 +73,7 @@ class WeightedVertexSet:
         except Exception:
             print("Could not load WeightedVertexSet configuration file.")
             raise
-        return WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
+        return WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, rng=rng)
 
 
 class EdgeWeightScaler(LoggableFunction[[float, np.random.Generator], float]):
@@ -86,11 +81,6 @@ class EdgeWeightScaler(LoggableFunction[[float, np.random.Generator], float]):
     @property
     def function_role(self):
         return "Edge weight scaler in power-law distribution"
-
-    def __call__(self, weight: float, generator: Optional[np.random.Generator] = None) -> float:
-        if generator is None:
-            generator = np.random.default_rng()
-        return super().__call__(weight, generator)
 
 
 class IdentityWeightScaler(EdgeWeightScaler):
@@ -117,21 +107,17 @@ class PowerLawWeightGenerator(WeightGenerator):
         if tau <= 2:
             raise ValueError("tau must be greater than 2 for the expected degrees to be finite.")
 
-        self._function = lambda vertices, generator: self._power_law_sample(vertices=vertices, tau=tau, scaling=ell,
-                                                                            generator=generator)
+        self._function = lambda vertices, rng: self._power_law_sample(vertices=vertices, tau=tau, scaling=ell, rng=rng)
 
     @staticmethod
-    def _power_law_sample(vertices: VertexSet, tau: float, scaling: EdgeWeightScaler,
-                          generator: Optional[np.random.Generator] = None) -> List[float]:
+    def _power_law_sample(vertices: VertexSet, tau: float, scaling: EdgeWeightScaler, rng: np.random.Generator) \
+            -> List[float]:
         """Samples weights W for the given VertexSet i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
         and using the specified RNG, then applies the given scaling map to each weight."""
-        if generator is None:
-            generator = np.random.default_rng()
-
         # The upper bound isn't included in the range, so this samples a 31-bit integer to pass to Cython.
-        C_seed = generator.integers(low=0, high=2 ** 31)
+        C_seed = rng.integers(low=0, high=2 ** 31)
         weights = gs.generateWeights(n=vertices.size, ple=tau, seed=C_seed)
-        curried_scaler = lambda weight: scaling(weight, generator)
+        curried_scaler = lambda weight: scaling(weight, rng)
         if type(scaling) is not IdentityWeightScaler:
             efficient_ell = np.vectorize(curried_scaler)
             weights = efficient_ell(weights)

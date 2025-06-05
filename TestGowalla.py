@@ -49,8 +49,8 @@ class GenerationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         entropy = 89654657203871215244168134687054070552
-        generator = np.random.default_rng(seed=entropy)
-        cls.instance = GowallaDataReader(generator=generator, vertex_path=GowallaSIEpidemic._SAVED_VERTEX_PATH,
+        rng = np.random.default_rng(seed=entropy)
+        cls.instance = GowallaDataReader(rng=rng, vertex_path=GowallaSIEpidemic._SAVED_VERTEX_PATH,
                                          edge_path=GowallaSIEpidemic._SAVED_EDGE_PATH)
 
     def test_position_calculation_basic(self):
@@ -127,7 +127,8 @@ class GenerationTests(unittest.TestCase):
     def test_save_load(self):
         self.instance.save_files()
         edge_cost_generator = GenericEdgeCostGenerator(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test")
+        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test",
+                                          rng=np.random.default_rng())
 
         original_vertices = self.instance.vertices
         loaded_vertices = test_epidemic.vertex_set
@@ -152,7 +153,8 @@ class GraphTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         edge_cost_generator = GenericEdgeCostGenerator(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test")
+        test_epidemic = GowallaSIEpidemic(edge_cost_generator=edge_cost_generator, mu=1., zeta=2., name="test",
+                                          rng=np.random.default_rng())
         cls.vertex_set = test_epidemic.vertex_set
         cls.graph = test_epidemic.graph
 

@@ -52,7 +52,7 @@ class FileIOTests(unittest.TestCase):
         self.clearTestFiles()
 
         self.entropy = 99217604857427484066604220485342406204
-        self.generator = np.random.default_rng(seed=self.entropy)
+        self.rng = np.random.default_rng(seed=self.entropy)
 
         _reset_generator_globals()
 
@@ -61,8 +61,8 @@ class FileIOTests(unittest.TestCase):
         cost_generator = GenericEdgeCostGenerator(_dummy_cost_generator, "Test cost generator")
 
         vertex_generator = Lattice(dimension=2, size=2)
-        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator)
-        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator,
+        vertices = WeightedVertexSet(vertex_generator=vertex_generator, weight_generator=weight_generator, rng=self.rng)
+        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_generator, rng=self.rng,
                                    edge_generator=edge_generator, mu=0.5, zeta=1.5, name="test")
 
         self.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")

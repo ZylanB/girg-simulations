@@ -109,7 +109,7 @@ class TestVertexSet(unittest.TestCase):
 
 class TestLattice(unittest.TestCase):
     def test_1d(self):
-        test_instance = Lattice(dimension=1, size=6)()
+        test_instance = Lattice(dimension=1, size=6)(np.random.default_rng())
         point_set = {(0.,), (1.,), (2.,), (3.,), (4.,), (5.,)}
         self.assertEqual(set(test_instance.positions), point_set)
 
@@ -122,7 +122,7 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(positions, {(2.,), (3.,), (4.,)})
 
     def test_2d(self):
-        test_instance = Lattice(dimension=2, size=4)()
+        test_instance = Lattice(dimension=2, size=4)(np.random.default_rng())
         point_set = {(0., 0.), (0., 1.), (0., 2.), (0., 3.),
                      (1., 0.), (1., 1.), (1., 2.), (1., 3.),
                      (2., 0.), (2., 1.), (2., 2.), (2., 3.),
@@ -160,19 +160,19 @@ class TestPPP(unittest.TestCase):
         distribution with mean 18. In each case the allowed error in total variation distance is .01."""
 
         entropy = 207557186055428275376091733348063779829  # Generated from numpy via SeedSequence().entropy
-        generator = np.random.default_rng(seed=entropy)
+        rng = np.random.default_rng(seed=entropy)
 
         big_point_counts = defaultdict(lambda: 0)
         small_point_counts = defaultdict(lambda: 0)
 
         instance_generator = PoissonPointProcess(dimension=2, size=10.)
         for i in range(100000):
-            instance = instance_generator(generator)
+            instance = instance_generator(rng)
 
             # Lower-left corners for each square
-            big_corner = generator.uniform(low=0., high=5., size=2)
-            small_left_corner = generator.uniform(low=0., high=2., size=2)
-            small_right_corner = generator.uniform(low=5., high=7., size=2)
+            big_corner = rng.uniform(low=0., high=5., size=2)
+            small_left_corner = rng.uniform(low=0., high=2., size=2)
+            small_right_corner = rng.uniform(low=5., high=7., size=2)
 
             def in_square(p, corner, side):
                 return corner[0] <= p[0] < corner[0] + side and corner[1] <= p[1] < corner[1] + side
