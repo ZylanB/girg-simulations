@@ -58,23 +58,23 @@ class SIEpidemic:
     """Stores a spatial graph whose edge weights determine the spread of an SI model epidemic. Edge_cost_generator
     should return a sample of the *random* part of an edge's cost, i.e. not including degree or spatial penalties
     (which are calculated in WeightedVertexSet). Mu should be the weight penalty, and zeta should be the spatial
-    penalty."""
+    penalty. Name determines the filenames used for logging."""
     def __init__(self, vertex_set: WeightedVertexSet, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float,
-                 edge_generator: EdgeGenerator, generator: Optional[np.random.Generator] = None) -> None:
+                 edge_generator: EdgeGenerator, name: str, generator: Optional[np.random.Generator] = None) -> None:
         self.vertex_set = vertex_set
         self.edge_cost_generator = edge_cost_generator
         self.edge_generator = edge_generator
-        self.generator = generator
         self.mu = mu
         self.zeta = zeta
+        self.name = name
 
         self.graph = gt.Graph(directed=False)
         self.graph.add_vertex(n=self.vertex_set.size)
         self.edge_costs = self.graph.new_edge_property("double")
         self.graph.edge_properties["edge_costs"] = self.edge_costs
 
-        self.sample_edges()
-        self.sample_edge_costs()
+        self.sample_edges(generator)
+        self.sample_edge_costs(generator)
 
         # These will be set on calling self.run_infection, which takes the initial vertex as an argument.
         # Uninfected vertices have infinite infection time. Vertices without an infector (including the source vertex)
@@ -85,19 +85,19 @@ class SIEpidemic:
         self.graph.vertex_properties["infectors"] = self.infectors
         self.initial_vertex = None
 
-    def sample_edges(self) -> None:
+    def sample_edges(self, generator: Optional[np.random.Generator]) -> None:
         """(Re)samples the edge set of the graph from the given vertex set. Vertex IDs in the graph correspond to
         vertex IDs from the WeightedVertexSet."""
         self.graph.clear_edges()
-        edges = self.edge_generator(self.vertex_set, self.generator)
+        edges = self.edge_generator(self.vertex_set, generator)
         self.graph.add_edge_list(edges)
 
-    def sample_edge_costs(self) -> None:
+    def sample_edge_costs(self, generator: Optional[np.random.Generator]) -> None:
         """(Re)samples only the edge costs while maintaining the current edge set."""
         for edge in self.graph.edges():
             u_id = self.graph.vertex_index[edge.source()]
             v_id = self.graph.vertex_index[edge.target()]
-            new_cost = self.edge_cost_generator(self.generator)
+            new_cost = self.edge_cost_generator(generator)
             new_cost *= self.vertex_set.penalty(u_id, v_id, mu=self.mu, zeta=self.zeta)
             self.edge_costs[edge] = new_cost
 
@@ -184,18 +184,46 @@ class SIEpidemic:
             return None
         return len(path) - 1
 
-    def save_to_file(self, folder: Path, name: str):
-        """Logs all data in the current epidemic to the given file in pickle format. The epidemic will be saved in two
-        files, one name.gt file and one name.pickle file."""
-        with open(folder / f"{name}.pickle", "wb") as file:
-            dill.dump(self.vertex_set, file, protocol=dill.HIGHEST_PROTOCOL)
+    @property
+    def config_filename(self) -> str:
+        return f"{self.name}-epidemic-settings.pickle"
+
+    @property
+    def vertex_config_filename(self) -> str:
+        return f"{self.name}-vertex-settings.pickle"
+
+    def vertex_filename(self, run_index: Optional[int]) -> str:
+        if run_index is None:
+            return f"{self.name}-vertices.pickle"
+        return f"{self.name}-vertices-run-{run_index}.pickle"
+
+    def graph_filename(self, run_index: Optional[int]) -> str:
+        if run_index is None:
+            return f"{self.name}-graph.gt"
+        return f"{self.name}-graph-run-{run_index}.gt"
+
+    def save_configuration(self, folder: Path) -> None:
+        """Logs only the data needed to re-run the current epidemic to the given folder, with filenames depending
+        on run_index. This is often significantly more space-efficient and faster."""
+        with open(folder / self.config_filename, "wb") as file:
             dill.dump(self.edge_generator, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.edge_cost_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.mu, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.zeta, file, protocol=dill.HIGHEST_PROTOCOL)
+        self.vertex_set.save_configuration(folder / self.vertex_config_filename)
 
-        self.graph.save(str(folder / f"{name}.gt"))
+    def save_vertices(self, folder: Path, run_index: Optional[int]) -> None:
+        """Logs the current vertex set in full to the given folder with filename depending on run_index."""
+        with open(folder / self.vertex_filename(run_index), "wb") as file:
+            dill.dump(self.vertex_set, file, protocol=dill.HIGHEST_PROTOCOL)
+
+    def save_graph(self, folder: Path, run_index: Optional[int]) -> None:
+        """Logs the current epidemic graph (with all infection information) to the given folder with filename
+        depending on run_index."""
+        self.graph.save(str(folder / self.graph_filename(run_index)))
 
     @staticmethod
-    def _empty_epidemic() -> SIEpidemic:
+    def _empty_epidemic(name: str) -> SIEpidemic:
         """Creates an empty SIEpidemic object which can be initialised manually. Used when loading from files."""
         vertex_gen = Lattice(size=1, dimension=1)
         weight_gen = FixedWeightGenerator(weights={0: 1}, description="Empty epidemic")
@@ -203,28 +231,76 @@ class SIEpidemic:
         edge_gen = FixedGraphGenerator(edges=[], description="Empty graph")
         cost_gen = ConstantCostGenerator(c=0)
         return SIEpidemic(vertex_set=weighted_vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen, mu=0.,
-                          zeta=0.)
+                          zeta=0., name=name)
 
-    @staticmethod
-    def load_from_file(folder: Path, name: str) -> SIEpidemic:
-        """Loads an SIEpidemic saved via the save_to_file method as name.gt and name.pickle and returns the resulting
-        object."""
-        with open(folder / f"{name}.pickle", "rb") as file:
-            vertices = dill.load(file)
-            edge_gen = dill.load(file)
-            cost_gen = dill.load(file)
-            graph = gt.load_graph(str(folder / f"{name}.gt"))
+    @classmethod
+    def load_from_config(cls, folder: Path, name: str, generator: Optional[np.random.Generator] = None) -> "SIEpidemic":
+        """Loads an SIEpidemic with configuration information only present in the given folder and returns it,
+        recreating the vertex set and graph. If information for the given run_index is not present, falls back to
+        run_index None (intended for experiments where e.g. the vertex set is kept constant across all runs)."""
+        return_value = cls._empty_epidemic(name=name)
 
-            return_value = SIEpidemic._empty_epidemic()
-            return_value.vertex_set = vertices
-            return_value.edge_generator = edge_gen
-            return_value.edge_cost_generator = cost_gen
-            return_value.graph = graph
-            return_value.infection_times = graph.vertex_properties["infection_times"]
-            return_value.infectors = graph.vertex_properties["infectors"]
-            return_value.edge_costs = graph.edge_properties["edge_costs"]
+        try:
+            with open(folder / return_value.config_filename, "rb") as file:
+                return_value.edge_generator = dill.load(file)
+                return_value.edge_cost_generator = dill.load(file)
+                return_value.mu = dill.load(file)
+                return_value.zeta = dill.load(file)
+        except Exception:
+            print("Could not load SIEpidemic configuration file.")
+            raise
 
-            return return_value
+        vertices = WeightedVertexSet.load_from_configuration(path=folder / return_value.vertex_config_filename,
+                                                             generator=generator)
+        return_value.vertex_set = vertices
+        return_value.graph.add_vertex(n=vertices.size)
+        return_value.sample_edges(generator)
+        return_value.sample_edge_costs(generator)
+
+        return return_value
+
+    @classmethod
+    def load_full(cls, folder: Path, name: str, run_index: Optional[int]) -> "SIEpidemic":
+        """Loads an SIEpidemic with configuration, vertex and graph information present in the given folder and
+        returns it. If information for the given run_index is not present, falls back to run_index None (intended
+        for experiments where e.g. the vertex set is kept constant across all runs)."""
+        return_value = cls._empty_epidemic(name=name)
+
+        try:
+            with open(folder / return_value.config_filename, "rb") as file:
+                return_value.edge_generator = dill.load(file)
+                return_value.edge_cost_generator = dill.load(file)
+                return_value.mu = dill.load(file)
+                return_value.zeta = dill.load(file)
+        except Exception:
+            print("Could not load SIEpidemic configuration file.")
+            raise
+
+        if (folder / return_value.vertex_filename(run_index)).exists():
+            vertex_path = folder / return_value.vertex_filename(run_index)
+        else:
+            vertex_path = folder / return_value.vertex_filename(None)
+        try:
+            with open(vertex_path, "rb") as file:
+                return_value.vertex_set = dill.load(file)
+        except Exception:
+            print("Could not load WeightedVertexSet.")
+            raise
+
+        if (folder / return_value.graph_filename(run_index)).exists():
+            graph_path = folder / return_value.graph_filename(run_index)
+        else:
+            graph_path = folder / return_value.graph_filename(None)
+        try:
+            return_value.graph = gt.load_graph(str(graph_path))
+        except Exception:
+            print("Could not load graph.")
+            raise
+
+        return_value.infection_times = return_value.graph.vertex_properties["infection_times"]
+        return_value.infectors = return_value.graph.vertex_properties["infectors"]
+        return_value.edge_costs = return_value.graph.edge_properties["edge_costs"]
+        return return_value
 
 
 class GirgGenerator(EdgeGenerator):

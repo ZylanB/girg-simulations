@@ -241,7 +241,7 @@ class GowallaSIEpidemic(SIEpidemic):
     _SAVED_VERTEX_PATH = Path.cwd() / "gowalla_vertices.pickle"
     _SAVED_EDGE_PATH = Path.cwd() / "gowalla_edges.pickle"
 
-    def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float,
+    def __init__(self, edge_cost_generator: EdgeCostGenerator, mu: float, zeta: float, name: str,
                  generator: Optional[np.random.Generator] = None):
         if not self._saved_graph_present():
             print("Gowalla data not present. Recreating...")
@@ -251,7 +251,7 @@ class GowallaSIEpidemic(SIEpidemic):
         vertex_set = self._load_vertices(mu, zeta)
         edge_generator = self._load_edges()
         super().__init__(vertex_set=vertex_set, edge_cost_generator=edge_cost_generator, edge_generator=edge_generator,
-                         mu=mu, zeta=zeta, generator=generator)
+                         mu=mu, zeta=zeta, generator=generator, name=name)
 
     @classmethod
     def _saved_graph_present(cls):

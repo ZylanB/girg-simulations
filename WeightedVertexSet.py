@@ -4,6 +4,8 @@ import girg_sampling.girgs as gs  # type: ignore
 import numpy as np
 from dataclasses import dataclass
 from LoggableFunction import LoggableFunction
+from pathlib import Path
+import dill  # type: ignore
 
 
 class WeightGenerator(LoggableFunction[[VertexSet, np.random.Generator], Sequence[float]]):
@@ -35,8 +37,7 @@ class WeightedVertexSet:
         self.vertices = self.vertex_generator(generator)
         self.weight_generator = weight_generator
         self.weights: Sequence[float] = []
-        self.generator = generator
-        self.resample_weights()
+        self.resample_weights(generator)
 
     def __getattr__(self, item):
         """Delegation, allows use of members and methods from VertexSet without formal inheritance."""
@@ -47,16 +48,37 @@ class WeightedVertexSet:
         """Returns the weight of the vertex with the given id."""
         return self.weights[id_]
 
-    def resample_weights(self) -> Sequence[float]:
+    def resample_weights(self, generator: Optional[np.random.Generator]) -> None:
         """Resamples the vertex weights from the given generator function."""
-        self.weights = self.weight_generator(self.vertices, self.generator)
-        return self.weights
+        self.weights = self.weight_generator(self.vertices, generator)
+
+    def resample_vertices(self, generator: Optional[np.random.Generator]):
+        """Resamples the whole vertex set, including the weights, from the given generator functions."""
+        self.vertices = self.vertex_generator(generator)
+        self.resample_weights(generator)
 
     def penalty(self, x_id: int, y_id: int, mu: float, zeta: float) -> float:
         """Returns the total penalty for a possible edge (specified by vertex IDs), not including the random cost."""
         spatial_penalty = self.vertices.distance(x_id, y_id) ** zeta
         weight_penalty = (self.weight(x_id) * self.weight(y_id)) ** mu
         return spatial_penalty * weight_penalty
+
+    def save_configuration(self, path: Path) -> None:
+        """Save the generator functions to file; this is often much smaller than the full vertex set."""
+        with open(path, "wb") as file:
+            dill.dump(self.weight_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.vertex_generator, file, protocol=dill.HIGHEST_PROTOCOL)
+
+    @classmethod
+    def load_from_configuration(cls, path: Path, generator: Optional[np.random.Generator]) -> "WeightedVertexSet":
+        try:
+            with open(path, "rb") as file:
+                weight_gen = dill.load(file)
+                vertex_gen = dill.load(file)
+        except Exception:
+            print("Could not load WeightedVertexSet configuration file.")
+            raise
+        return WeightedVertexSet(vertex_generator=vertex_gen, weight_generator=weight_gen, generator=generator)
 
 
 class EdgeWeightScaler(LoggableFunction[[float, np.random.Generator], float]):

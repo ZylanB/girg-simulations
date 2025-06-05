@@ -35,11 +35,11 @@ class BasicTests(unittest.TestCase):
                       (self.a_id, self.c_id), (self.a_id, self.e_id)]
         edge_generator = FixedGraphGenerator(edges=self.edges, description="Test graph")
 
-        self.unpenalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator,
+        self.unpenalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator, name="test",
                                                edge_cost_generator=ConstantCostGenerator(1.), mu=0., zeta=0.)
         self.unpenalised_epidemic.run_infection(self.a_id)
 
-        self.penalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator,
+        self.penalised_epidemic = SIEpidemic(vertex_set=vertices, edge_generator=edge_generator, name="test",
                                              edge_cost_generator=ConstantCostGenerator(1.), mu=self.mu, zeta=self.zeta)
         self.penalised_epidemic.run_infection(self.a_id)
 
@@ -197,7 +197,7 @@ class GIRGTests(unittest.TestCase):
 
         graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=.25)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator)
+                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator, name="test")
 
         vertex_a = epidemic.graph.vertex(0)
         vertex_b = epidemic.graph.vertex(1)
@@ -218,7 +218,7 @@ class GIRGTests(unittest.TestCase):
         for i in range(100000):
             if i % 10000 == 0:
                 print(f"Test run {i//1000}k/100k")
-            epidemic.sample_edges()
+            epidemic.sample_edges(generator)
 
             # Even though the graph is undirected, edges are still stored as tuples.
             guaranteed_edges = [(vertex_a, vertex_b), (vertex_b, vertex_c), (vertex_c, vertex_d), (vertex_d, vertex_a)]
@@ -258,7 +258,7 @@ class GIRGTests(unittest.TestCase):
 
         graph_gen = GirgGenerator(alpha=self.alpha, scale_factor=1/3)
         epidemic = SIEpidemic(vertex_set=vertices, edge_cost_generator=ConstantCostGenerator(0.),
-                              edge_generator=graph_gen, mu=0., zeta=0., generator=generator)
+                              edge_generator=graph_gen, mu=0., zeta=0., name="test", generator=generator)
 
         vertex_a = epidemic.graph.vertex(0)
         vertex_b = epidemic.graph.vertex(1)
@@ -284,7 +284,7 @@ class GIRGTests(unittest.TestCase):
         for i in range(100000):
             if i % 10000 == 0:
                 print(f"Test run {i // 1000}k/100k")
-            epidemic.sample_edges()
+            epidemic.sample_edges(generator)
 
             # Even though the graph is undirected, edges are still stored as tuples.
             guaranteed_edges = [(vertex_a, vertex_b), (vertex_a, vertex_c), (vertex_a, vertex_d), (vertex_a, vertex_g),
@@ -310,6 +310,20 @@ class GIRGTests(unittest.TestCase):
 
 
 class FileIOTests(unittest.TestCase):
+    def setUp(self):
+        self.log_path = Path.cwd() / "test_files"
+        self.log_path.mkdir(parents=True, exist_ok=True)
+        self.clearTestFiles()
+
+    def tearDown(self):
+        self.clearTestFiles()
+
+    def clearTestFiles(self):
+        # Clear out existing files from previous tests to make sure new ones are created.
+        for child in self.log_path.iterdir():
+            if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
+                child.unlink()
+
     def testDeterministic(self):
         entropy = 252869566619441809084118758734182862550
         generator = np.random.default_rng(seed=entropy)
@@ -327,12 +341,14 @@ class FileIOTests(unittest.TestCase):
         cost_gen = FPPCostGenerator(lambda_=1.)
         edge_gen = GirgGenerator(alpha=1.8, scale_factor=1/100)
         saved_value = SIEpidemic(vertex_set=vertices, edge_cost_generator=cost_gen, edge_generator=edge_gen,
-                                 mu=1., zeta=0.5, generator=generator)
+                                 mu=1., zeta=0.5, generator=generator, name="test")
         saved_value.run_infection(np.random.randint(10000))
 
-        saved_value.save_to_file(Path.cwd(), "test_graph")
-        loaded_value = SIEpidemic.load_from_file(Path.cwd(), "test_graph")
+        saved_value.save_vertices(self.log_path, 2)
+        saved_value.save_graph(self.log_path, 2)
+        saved_value.save_configuration(self.log_path)
 
+        loaded_value = SIEpidemic.load_full(folder=self.log_path, name="test", run_index=2)
         saved_vertices = saved_value.vertex_set
         loaded_vertices = loaded_value.vertex_set
 

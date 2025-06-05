@@ -33,7 +33,7 @@ class BasicTests(unittest.TestCase):
         self.assertEqual(self.weights[2], self.vertices.weight(self.id_2))
         self.assertEqual(self.weights["abc"], self.vertices.weight(self.id_abc))
 
-        self.vertices.resample_weights()
+        self.vertices.resample_weights(np.random.default_rng())
         self.assertEqual(self.weights[1], self.vertices.weight(self.id_1))
         self.assertEqual(self.weights[2], self.vertices.weight(self.id_2))
         self.assertEqual(self.weights["abc"], self.vertices.weight(self.id_abc))
@@ -54,7 +54,7 @@ class BasicTests(unittest.TestCase):
 
         data = WeightedVertexSet(self.vertex_gen, weight_generator, generator)
         first_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
-        data.resample_weights()
+        data.resample_weights(generator)
         second_sample = {id_: data.weights[id_] for id_ in self.vertices.ids}
 
         self.assertEqual(first_sample.keys(), second_sample.keys())
