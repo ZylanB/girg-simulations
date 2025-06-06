@@ -1,7 +1,11 @@
 import unittest
 import textwrap
-from SIExperiment import *
+
+import numpy as np
+from pathlib import Path
+
 from SIEpidemic import SIEpidemic, GenericEdgeCostGen, GenericEdgeGen
+from SIExperiment import SIExperiment, GenericInitialVertexFunction, GenericResultFunction
 from VertexSet import Lattice
 from WeightedVertexSet import WeightedVertexSet, GenericWeightGen
 

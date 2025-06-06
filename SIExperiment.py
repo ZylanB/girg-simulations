@@ -1,9 +1,11 @@
-from SIEpidemic import SIEpidemic
 from typing import Any, List, Optional, Union
 from pathlib import Path
+
 import numpy as np
 import dill  # type: ignore
+
 from LoggableFunction import LoggableFunction
+from SIEpidemic import SIEpidemic
 
 
 class InitialVertexFunction(LoggableFunction[[np.random.Generator], int]):

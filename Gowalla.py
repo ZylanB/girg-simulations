@@ -1,20 +1,20 @@
 from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
-import datetime
-import requests
-import gzip
 from collections import defaultdict
+import datetime
+from dataclasses import dataclass
+import gzip
 from pathlib import Path
+import requests
 import shutil
-import dill  # type: ignore
+from typing import List, Optional, Sequence, Tuple
 
-import numpy as np
+import dill  # type: ignore
 import matplotlib.pyplot as plt
+import numpy as np
+
 from SIEpidemic import SIEpidemic, EdgeGen, FixedGraphGen, EdgeCostGen
-from WeightedVertexSet import WeightedVertexSet, create_from_degrees_gen
 from VertexSet import FixedVertexSet, EarthDistance
+from WeightedVertexSet import WeightedVertexSet, create_from_degrees_gen
 
 
 @dataclass(slots=True)

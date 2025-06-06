@@ -1,11 +1,13 @@
-from VertexSet import VertexSet, VertexSetGen
-from typing import Any, Mapping, Optional, List, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping, List, Sequence
+
+import dill  # type: ignore
 import girg_sampling.girgs as gs  # type: ignore
 import numpy as np
-from dataclasses import dataclass
+
 from LoggableFunction import LoggableFunction
-from pathlib import Path
-import dill  # type: ignore
+from VertexSet import VertexSet, VertexSetGen
 
 
 class WeightGen(LoggableFunction[[VertexSet, np.random.Generator], Sequence[float]]):

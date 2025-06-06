@@ -1,16 +1,15 @@
 from __future__ import annotations
+from pathlib import Path
+from typing import Any, List, Optional, Sequence, Tuple
 
 import dill  # type: ignore # Extension of pickle that supports encoding/decoding functions.
-
-import numpy as np
+import girg_sampling.girgs as gs  # type: ignore
 import graph_tool as gt  # type: ignore
 from graph_tool.topology import shortest_distance  # type: ignore
-import girg_sampling.girgs as gs  # type: ignore
-from pathlib import Path
+import numpy as np
 
 from LoggableFunction import LoggableFunction
 from WeightedVertexSet import WeightedVertexSet, FixedWeightGen
-from typing import Any, List, Optional, Sequence, Tuple
 from VertexSet import Lattice
 
 

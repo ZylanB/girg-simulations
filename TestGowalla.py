@@ -1,9 +1,11 @@
+import datetime
 import unittest
 
 import graph_tool.topology  # type: ignore
-from Gowalla import *
-from SIEpidemic import GenericEdgeCostGen
+import numpy as np
 
+from Gowalla import CheckIn, GowallaDataReader, GowallaSIEpidemic
+from SIEpidemic import GenericEdgeCostGen
 from TestDistribution import dkw_p_value
 
 

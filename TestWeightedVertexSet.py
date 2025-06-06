@@ -1,9 +1,14 @@
-import unittest
-from TestDistribution import dkw_p_value
-from WeightedVertexSet import *
-from VertexSet import FixedVertexSet, EuclideanDistance
 from collections import defaultdict
 from math import floor
+from typing import List
+import unittest
+
+import numpy as np
+
+from TestDistribution import dkw_p_value
+from VertexSet import FixedVertexSet, EuclideanDistance, VertexSet
+from WeightedVertexSet import (create_from_degrees_gen, FixedWeightGen, GenericEdgeWeightScaler, GenericWeightGen,
+                               PowerLawWeightGen, WeightedVertexSet)
 
 
 class BasicTests(unittest.TestCase):

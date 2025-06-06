@@ -1,8 +1,8 @@
-from scipy.stats import poisson  # type: ignore
-import unittest
 from math import exp
 from typing import Callable, Dict
+import unittest
 
+from scipy.stats import poisson  # type: ignore
 
 def sample_tvd(sample_data: Dict[int, int], pmf: Callable[[int], float]):
     r"""Given a probability mass function F and sample data with sample mass function F', returns

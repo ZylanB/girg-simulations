@@ -1,10 +1,12 @@
-from math import pow
-import haversine  # type: ignore
+from dataclasses import dataclass
 import functools
 import itertools
-import numpy as np
+from math import pow
 from typing import Any, Dict, List, Mapping, Set, Sequence
-from dataclasses import dataclass
+
+import haversine  # type: ignore
+import numpy as np
+
 from LoggableFunction import LoggableFunction
 
 

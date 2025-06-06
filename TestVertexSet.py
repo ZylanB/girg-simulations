@@ -1,8 +1,11 @@
-from TestDistribution import dkw_p_value
-from scipy.stats import poisson  # type: ignore
-import unittest
-from VertexSet import *
 from collections import defaultdict
+import unittest
+
+import numpy as np
+from scipy.stats import poisson  # type: ignore
+
+from TestDistribution import dkw_p_value
+from VertexSet import EarthDistance, GenericMetric, Lattice, PoissonPointProcess, VertexSet
 
 
 class TestVertexSet(unittest.TestCase):
