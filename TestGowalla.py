@@ -60,8 +60,8 @@ class DownloadTests(unittest.TestCase):
 class GenerationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        entropy = 89654657203871215244168134687054070552
-        rng = np.random.default_rng(seed=entropy)
+        cls.entropy = 89654657203871215244168134687054070552
+        rng = np.random.default_rng(seed=cls.entropy)
         cls.instance = GowallaDataCreator(rng=rng, folder=TEST_SAVE_FOLDER)
 
     def test_position_calculation_basic(self):
@@ -139,9 +139,22 @@ class GenerationTests(unittest.TestCase):
         clear_test_files()
         self.instance.save_files()
         edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        # Should load the Gowalla dataset we just saved. If it doesn't, the result will differ due to different seeds.
         test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng(), gowalla_folder=TEST_SAVE_FOLDER)
+        self.check_against_instance(test_epidemic)
+        clear_test_files()
 
+    def test_recreate_load(self):
+        clear_test_files()
+        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        # Should recreate the Gowalla dataset with the same RNG seed as in setup, then save it, then load it.
+        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
+                                          rng=np.random.default_rng(seed=self.entropy), gowalla_folder=TEST_SAVE_FOLDER)
+        self.check_against_instance(test_epidemic)
+        clear_test_files()
+
+    def check_against_instance(self, test_epidemic):
         original_vertices = self.instance.vertices
         original_weights = self.instance.weights
         loaded_vertices = test_epidemic.vertex_set.vertices
@@ -161,7 +174,6 @@ class GenerationTests(unittest.TestCase):
         loaded_edges = test_epidemic.graph.edges()
         loaded_edge_pairs = {(e.source(), e.target()) for e in loaded_edges}
         self.assertEqual(original_edge_pairs, loaded_edge_pairs)
-        clear_test_files()
 
 
 class GraphTests(unittest.TestCase):
