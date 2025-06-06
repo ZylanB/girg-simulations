@@ -139,7 +139,7 @@ class EuclideanDistance(Metric):
 
     @staticmethod
     def _euclidean_distance(x: Sequence[float], y: Sequence[float], d: int) -> float:
-        return pow(sum((x[i] - y[i]) ** d for i in range(len(x))), 1 / d)
+        return pow(sum(abs(x[i] - y[i]) ** d for i in range(len(x))), 1 / d)
 
 
 class TorusDistance(Metric):

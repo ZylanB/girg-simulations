@@ -1,11 +1,12 @@
 from collections import defaultdict
+from math import sqrt
 import unittest
 
 import numpy as np
 from scipy.stats import poisson  # type: ignore
 
 from TestDistribution import dkw_p_value
-from VertexSet import EarthDistance, GenericMetric, Lattice, PoissonPointProcess, VertexSet
+from VertexSet import EarthDistance, GenericMetric, Lattice, PoissonPointProcess, VertexSet, EuclideanDistance
 
 
 class TestVertexSet(unittest.TestCase):
@@ -108,6 +109,25 @@ class TestVertexSet(unittest.TestCase):
         # Ball should be closed
         points_found = self.test_instance.get_ids_in_ball(center=(1., 1.), radius=1.0)
         self.assertEqual(set(points_found), {0, 1, 2})
+
+
+class TestEuclideanDistance(unittest.TestCase):
+    def test_distance(self):
+        one_dim = EuclideanDistance(d=1)
+        self.assertEqual(one_dim((1.,), (1.,)), 0.)
+        self.assertEqual(one_dim((1.,), (2.,)), 1.)
+        self.assertEqual(one_dim((2.,), (1.,)), 1.)
+        self.assertEqual(one_dim((1.,), (3.,)), 2.)
+        self.assertEqual(one_dim((3.,), (1.,)), 2.)
+
+        two_dim = EuclideanDistance(d=2)
+        self.assertEqual(two_dim((1., 1.), (1., 1.)), 0.)
+        self.assertEqual(two_dim((1., 1.), (2., 1.)), 1.)
+        self.assertEqual(two_dim((2., 1.), (1., 1.)), 1.)
+        self.assertEqual(two_dim((1., 1.), (1., 2.)), 1.)
+        self.assertEqual(two_dim((1., 2.), (1., 1.)), 1.)
+        self.assertEqual(two_dim((1., 1.), (2., 2.)), sqrt(2))
+        self.assertEqual(two_dim((2., 2.), (1., 1.)), sqrt(2))
 
 
 class TestLattice(unittest.TestCase):
