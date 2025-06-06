@@ -172,6 +172,13 @@ class VertexSetGen(LoggableFunction[[np.random.Generator], VertexSet]):
         return "Vertex set generator"
 
 
+class GenericVertexSetGen(VertexSetGen):
+    """Lightweight option to just pass in the function you care about with a description for logging."""
+    def __init__(self, _function, description: str) -> None:
+        self.description = description
+        self._function = _function
+
+
 class FixedVertexSet(VertexSetGen):
     """Returns a fixed vertex set with the given metric and with dimension inferred from the given map of vertex IDs to
     positions in space."""
