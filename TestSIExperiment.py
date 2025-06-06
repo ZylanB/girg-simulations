@@ -1,8 +1,8 @@
+from pathlib import Path
 import unittest
 import textwrap
 
 import numpy as np
-from pathlib import Path
 
 from SIEpidemic import SIEpidemic, GenericEdgeCostGen, GenericEdgeGen
 from SIExperiment import SIExperiment, GenericInitialVertexFunction, GenericResultFunction
