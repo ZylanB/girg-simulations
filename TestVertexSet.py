@@ -18,8 +18,8 @@ class TestVertexSet(unittest.TestCase):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
         self.test_instance.set_points_from_names(point_dict)
 
-        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
-        self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
+        self.assertEqual(set(self.test_instance.positions), {(1., 1.), (2., 2.), (3., 3.)})
+        self.assertEqual(set(self.test_instance.names), {57, "Frog", 11.5})
         self.assertEqual(self.test_instance.size, 3)
 
         id_57 = self.test_instance.name_to_id(57)
@@ -31,9 +31,9 @@ class TestVertexSet(unittest.TestCase):
         point_list = [(1., 1.), (2., 2.), (3., 3.)]
         self.test_instance.set_points(point_list)
 
-        self.assertEqual(self.test_instance.names, {0, 1, 2})
-        self.assertEqual(self.test_instance.ids, {0, 1, 2})
-        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
+        self.assertEqual(set(self.test_instance.names), {0, 1, 2})
+        self.assertEqual(set(self.test_instance.ids), {0, 1, 2})
+        self.assertEqual(set(self.test_instance.positions), {(1., 1.), (2., 2.), (3., 3.)})
 
         for data in self.test_instance.vertex_data:
             self.assertEqual(data.name, data.id_)
@@ -42,9 +42,9 @@ class TestVertexSet(unittest.TestCase):
         point_dict = {57: (1., 1.), "Frog": (2., 2.), 11.5: (3., 3.)}
         self.test_instance.set_points_from_names(point_dict)
 
-        self.assertEqual(self.test_instance.names, {57, "Frog", 11.5})
-        self.assertEqual(self.test_instance.ids, {0, 1, 2})
-        self.assertEqual(self.test_instance.positions, {(1., 1.), (2., 2.), (3., 3.)})
+        self.assertEqual(set(self.test_instance.names), {57, "Frog", 11.5})
+        self.assertEqual(set(self.test_instance.ids), {0, 1, 2})
+        self.assertEqual(set(self.test_instance.positions), {(1., 1.), (2., 2.), (3., 3.)})
 
         id_57 = self.test_instance.name_to_id(57)
         id_frog = self.test_instance.name_to_id("Frog")

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import functools
 import itertools
 from math import pow
-from typing import Any, Dict, List, Mapping, Set, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Set, Sequence
 
 import haversine  # type: ignore
 import numpy as np
@@ -103,18 +103,19 @@ class VertexSet:
         return len(self._vertex_id_dict)
 
     @property
-    def positions(self) -> Set[Sequence[float]]:
-        """Returns the set of all positions in the vertex set."""
-        return set(self._vertex_position_dict.keys())
+    def positions(self) -> Iterable[Sequence[float]]:
+        """Returns an iterator over all positions in the vertex set."""
+        return self._vertex_position_dict.keys()
 
     @property
-    def names(self) -> Set[Any]:
-        """Returns the set of all vertex names in the vertex set."""
-        return set(self._vertex_name_dict.keys())
+    def names(self) -> Iterable[Any]:
+        """Returns an iterator over all vertex names in the vertex set."""
+        return self._vertex_name_dict.keys()
 
     @property
-    def ids(self) -> Set[int]:
-        return set(self._vertex_id_dict.keys())
+    def ids(self) -> Iterable[int]:
+        """Returns an iterator over all vertex IDs in the vertex set."""
+        return self._vertex_id_dict.keys()
 
     def get_ids_in_annulus(self, center: Sequence[float], inner_radius: float, outer_radius: float) -> List[int]:
         """Returns a list of IDs of points whose distance from center lies in [inner_radius, outer_radius]."""
