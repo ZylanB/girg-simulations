@@ -122,7 +122,7 @@ class SIExperiment:
         return self.results
 
     @property
-    def configuration_exists(self) -> bool:
+    def config_exists(self) -> bool:
         """Returns true if configuration information for this experiment has been logged."""
         settings_exist = (self.log_path / self.settings_name).exists()
         functions_exist = (self.log_path / self.functions_name).exists()
@@ -186,7 +186,7 @@ class SIExperiment:
 
         self._log_settings()
         self._log_functions()
-        self.epidemic.save_configuration(folder=self.log_path)
+        self.epidemic.save_config(folder=self.log_path)
 
     def _log_settings(self) -> None:
         """Saves the current settings in human-readable format."""
@@ -279,7 +279,7 @@ class SIExperiment:
                                     resample_vertices=False, resample_weights=False, log_path=folder, name=name,
                                     full_log=False, initial_vertex_fn=None, result_fn=None)
 
-        if not return_value.configuration_exists:
+        if not return_value.config_exists:
             raise FileNotFoundError(f"No existing logs found for the given SIExperiment '{name}'.")
         return_value.load_settings()
         if not use_old_seed:

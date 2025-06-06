@@ -60,14 +60,14 @@ class WeightedVertexSet:
         weight_penalty = (self.weight(x_id) * self.weight(y_id)) ** mu
         return spatial_penalty * weight_penalty
 
-    def save_configuration(self, path: Path) -> None:
+    def save_config(self, path: Path) -> None:
         """Save the generator functions to file; this is often much smaller than the full vertex set."""
         with open(path, "wb") as file:
             dill.dump(self.weight_gen, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.vertex_gen, file, protocol=dill.HIGHEST_PROTOCOL)
 
     @classmethod
-    def load_from_configuration(cls, path: Path, rng: np.random.Generator) -> "WeightedVertexSet":
+    def load_from_config(cls, path: Path, rng: np.random.Generator) -> "WeightedVertexSet":
         try:
             with open(path, "rb") as file:
                 weight_gen = dill.load(file)

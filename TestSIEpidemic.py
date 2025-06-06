@@ -350,7 +350,7 @@ class FileIOTests(unittest.TestCase):
 
         saved_value.save_vertices(self.log_path, 2)
         saved_value.save_graph(self.log_path, 2)
-        saved_value.save_configuration(self.log_path)
+        saved_value.save_config(self.log_path)
 
         loaded_value = SIEpidemic.load_full(folder=self.log_path, name="test", run_index=2)
         saved_vertices = saved_value.vertex_set

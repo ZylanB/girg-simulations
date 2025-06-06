@@ -191,7 +191,7 @@ class SIEpidemic:
             return f"{self.name}-graph.gt"
         return f"{self.name}-graph-run-{run_index}.gt"
 
-    def save_configuration(self, folder: Path) -> None:
+    def save_config(self, folder: Path) -> None:
         """Logs only the data needed to re-run the current epidemic to the given folder, with filenames depending
         on run_index. This is often significantly more space-efficient and faster."""
         with open(folder / self.config_filename, "wb") as file:
@@ -199,7 +199,7 @@ class SIEpidemic:
             dill.dump(self.edge_cost_gen, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.mu, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.zeta, file, protocol=dill.HIGHEST_PROTOCOL)
-        self.vertex_set.save_configuration(folder / self.vertex_config_filename)
+        self.vertex_set.save_config(folder / self.vertex_config_filename)
 
     def save_vertices(self, folder: Path, run_index: Optional[int]) -> None:
         """Logs the current vertex set in full to the given folder with filename depending on run_index."""
@@ -240,7 +240,7 @@ class SIEpidemic:
             print("Could not load SIEpidemic configuration file.")
             raise
 
-        vertices = WeightedVertexSet.load_from_configuration(path=folder / return_value.vertex_config_filename, rng=rng)
+        vertices = WeightedVertexSet.load_from_config(path=folder / return_value.vertex_config_filename, rng=rng)
         return_value.vertex_set = vertices
         return_value.graph.add_vertex(n=vertices.size)
         return_value.sample_edges(rng)
