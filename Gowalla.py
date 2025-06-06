@@ -4,13 +4,13 @@ import datetime
 from dataclasses import dataclass
 import gzip
 from pathlib import Path
-import requests
 import shutil
 from typing import List, Optional, Sequence, Tuple
 
 import dill  # type: ignore
 import matplotlib.pyplot as plt
 import numpy as np
+import requests
 
 from SIEpidemic import SIEpidemic, EdgeGen, FixedGraphGen, EdgeCostGen
 from VertexSet import FixedVertexSet, EarthDistance
