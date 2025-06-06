@@ -1,12 +1,22 @@
 import datetime
+from pathlib import Path
 import unittest
 
 import graph_tool.topology  # type: ignore
 import numpy as np
 
-from Gowalla import CheckIn, GowallaDataReader, GowallaSIEpidemic
+from Gowalla import CheckIn, GowallaDataCreator, GowallaSIEpidemic
 from SIEpidemic import GenericEdgeCostGen
 from TestDistribution import dkw_p_value
+
+
+TEST_SAVE_FOLDER = Path.cwd() / "test_files"
+
+
+def clear_test_files() -> None:
+    for child in TEST_SAVE_FOLDER.iterdir():
+        if child.is_file() and child.suffix == ".pickle":
+            child.unlink()
 
 
 class ParsingTests(unittest.TestCase):
@@ -23,7 +33,7 @@ class ParsingTests(unittest.TestCase):
 
     def test_edges(self):
         test_line = "3542\t4466\n".encode("utf-8")
-        id_0, id_1 = GowallaDataReader._parse_edge_line(test_line)
+        id_0, id_1 = GowallaDataCreator._parse_edge_line(test_line)
         self.assertEqual(id_0, 3542)
         self.assertEqual(id_1, 4466)
 
@@ -33,18 +43,18 @@ class DownloadTests(unittest.TestCase):
     def test_download(self):
         """Deletes the data, then attempts to re-download it. Asserts the resulting files exist and have non-zero
         size."""
-        GowallaDataReader._VERTEX_DATA_PATH.unlink(missing_ok=True)
-        GowallaDataReader._EDGE_DATA_PATH.unlink(missing_ok=True)
+        GowallaDataCreator._VERTEX_DATA_PATH.unlink(missing_ok=True)
+        GowallaDataCreator._EDGE_DATA_PATH.unlink(missing_ok=True)
 
-        self.assertFalse(GowallaDataReader._VERTEX_DATA_PATH.exists())
-        self.assertFalse(GowallaDataReader._EDGE_DATA_PATH.exists())
+        self.assertFalse(GowallaDataCreator._VERTEX_DATA_PATH.exists())
+        self.assertFalse(GowallaDataCreator._EDGE_DATA_PATH.exists())
 
-        GowallaDataReader._obtain_snap_data()
+        GowallaDataCreator._obtain_snap_data()
 
-        self.assertTrue(GowallaDataReader._VERTEX_DATA_PATH.exists())
-        self.assertGreater(GowallaDataReader._VERTEX_DATA_PATH.stat().st_size, 0)
-        self.assertTrue(GowallaDataReader._EDGE_DATA_PATH.exists())
-        self.assertGreater(GowallaDataReader._EDGE_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaDataCreator._VERTEX_DATA_PATH.exists())
+        self.assertGreater(GowallaDataCreator._VERTEX_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaDataCreator._EDGE_DATA_PATH.exists())
+        self.assertGreater(GowallaDataCreator._EDGE_DATA_PATH.stat().st_size, 0)
 
 
 class GenerationTests(unittest.TestCase):
@@ -52,8 +62,7 @@ class GenerationTests(unittest.TestCase):
     def setUpClass(cls):
         entropy = 89654657203871215244168134687054070552
         rng = np.random.default_rng(seed=entropy)
-        cls.instance = GowallaDataReader(rng=rng, vertex_path=GowallaSIEpidemic._SAVED_VERTEX_PATH,
-                                         edge_path=GowallaSIEpidemic._SAVED_EDGE_PATH)
+        cls.instance = GowallaDataCreator(rng=rng, folder=TEST_SAVE_FOLDER)
 
     def test_position_calculation_basic(self):
         check_ins = [
@@ -127,28 +136,32 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(6.137472530978548e-09, p_value)
 
     def test_save_load(self):
+        clear_test_files()
         self.instance.save_files()
         edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
-                                          rng=np.random.default_rng())
+                                          rng=np.random.default_rng(), gowalla_folder=TEST_SAVE_FOLDER)
 
         original_vertices = self.instance.vertices
-        loaded_vertices = test_epidemic.vertex_set
+        original_weights = self.instance.weights
+        loaded_vertices = test_epidemic.vertex_set.vertices
+        loaded_weight_fn = test_epidemic.vertex_set.weight
 
-        self.assertEqual(original_vertices.ids, loaded_vertices.ids)
+        self.assertEqual(set(original_vertices.ids), set(loaded_vertices.ids))
+        self.assertEqual(set(original_vertices.names), set(loaded_vertices.names))
+        self.assertEqual(set(original_vertices.positions), set(loaded_vertices.positions))
+
         for id_ in original_vertices.ids:
             self.assertEqual(original_vertices.id_to_position(id_), loaded_vertices.id_to_position(id_))
             self.assertEqual(original_vertices.id_to_name(id_), loaded_vertices.id_to_name(id_))
-            self.assertEqual(original_vertices.weight(id_), loaded_vertices.weight(id_))
-
-        self.assertEqual(loaded_vertices.mu, 1.)
-        self.assertEqual(loaded_vertices.zeta, 2.)
+            self.assertEqual(original_weights[id_], loaded_weight_fn(id_))
 
         original_edges = self.instance.edge_list
         original_edge_pairs = {(x[0], x[1]) for x in original_edges}
         loaded_edges = test_epidemic.graph.edges()
         loaded_edge_pairs = {(e.source(), e.target()) for e in loaded_edges}
         self.assertEqual(original_edge_pairs, loaded_edge_pairs)
+        clear_test_files()
 
 
 class GraphTests(unittest.TestCase):
