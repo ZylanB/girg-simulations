@@ -44,8 +44,8 @@ class SIExperiment:
     Attributes:
         epidemic: The SIEpidemic itself, which contains all information about the graph and how to resample it.
         run_count: The number of SI epidemics to simulate.
-        resample_edges: Whether the edges of the graph should be resampled between runs.
         resample_costs: Whether the edge costs of the graph should be resampled between runs.
+        resample_edges: Whether the entire edge set (including costs) should be resampled between runs.
         resample_weights: Whether the vertex weights should be resampled between runs.
         resample_vertices: Whether the entire vertex set (including weights) should be resampled between runs.
         initial_vertex_fn: A function to determine the (possibly random) initially-infected vertex ID each run.
@@ -87,16 +87,21 @@ class SIExperiment:
         if self.result_fn is None:
             raise RuntimeError("Attempting to run experiment with an undefined epidemic.")
 
-        if self.resample_vertices and not first_run:
-            self.epidemic.vertex_set.resample_vertices(self.rng)
-        if self.resample_weights and not self.resample_vertices and not first_run:
-            self.epidemic.vertex_set.resample_weights(self.rng)
-        if self.resample_edges and not first_run:
-            self.epidemic.sample_edges(self.rng)
-        if self.resample_costs and not first_run:
-            self.epidemic.sample_edge_costs(self.rng)
+        if not first_run:
+            if self.resample_vertices:
+                self.epidemic.vertex_set.resample_vertices(self.rng)
+                self.epidemic.sample_edges(self.rng)
+                self.epidemic.sample_edge_costs(self.rng)
+            else:
+                if self.resample_weights:
+                    self.epidemic.vertex_set.resample_weights(self.rng)
+                if self.resample_edges:
+                    self.epidemic.sample_edges(self.rng)
+                    self.epidemic.sample_edge_costs(self.rng)
+                elif self.resample_costs:
+                    self.epidemic.sample_edge_costs(self.rng)
         self.epidemic.run_infection(initial_vertex_id=self.initial_vertex_fn(self.rng))
-        self.results.append(self.result_fn(self.epidemic.graph, self.rng))
+        self.results.append(self.result_fn(self.epidemic, self.rng))
         if self.full_log:
             self._log_run()
 
