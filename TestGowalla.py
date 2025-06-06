@@ -143,6 +143,18 @@ class GenerationTests(unittest.TestCase):
         test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng(), gowalla_folder=TEST_SAVE_FOLDER)
         self.check_against_instance(test_epidemic)
+        test_epidemic.save_config(TEST_SAVE_FOLDER)
+
+        # Make sure the entire vertex and edge sets aren't getting pickled into the generators somehow, they should be
+        # <2kB rather than 5+MB.
+        self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.config_filename).exists())
+        self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.config_filename).stat().st_size < 2000)
+        self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.vertex_config_filename).exists())
+        self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.vertex_config_filename).stat().st_size < 2000)
+
+        test_epidemic = GowallaSIEpidemic.load_from_config(folder=TEST_SAVE_FOLDER, rng=np.random.default_rng(),
+                                                           name="test")
+        self.check_against_instance(test_epidemic)
         clear_test_files()
 
     def test_recreate_load(self):
