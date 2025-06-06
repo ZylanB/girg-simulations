@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import functools
 import itertools
 from math import pow
-from typing import Any, Dict, Iterable, List, Mapping, Set, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 import haversine  # type: ignore
 import numpy as np
@@ -181,14 +181,15 @@ class FixedVertexSet(VertexSetGen):
             if len(point) != dimension:
                 raise ValueError("Points must all have the same dimension!")
 
-        def _function(_):
-            return_value = VertexSet(dimension=dimension, metric=metric)
-            return_value.set_points_from_names(points)
-            return return_value
-
+        self.metric = metric
         self.dimension = dimension
         self.description = description
-        self._function = _function
+        self._function = functools.partial(self._get_vertex_set, points=points)
+
+    def _get_vertex_set(self, _: np.random.Generator, points: Mapping[Any, Sequence[float]]) -> VertexSet:
+        return_value = VertexSet(dimension=self.dimension, metric=self.metric)
+        return_value.set_points_from_names(points)
+        return return_value
 
 
 class Lattice(VertexSetGen):

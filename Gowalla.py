@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import defaultdict
 import datetime
 from dataclasses import dataclass
+import functools
 import gzip
 from pathlib import Path
 import shutil
@@ -261,10 +262,10 @@ class GowallaDataCreator:
 class _GowallaVertexGen(VertexSetGen):
     """Reads the Gowalla graph's vertices from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
-        self._function = lambda rng: self.get_vertices(folder, rng)
+        self._function = functools.partial(self._get_vertices, folder=folder)
 
     @staticmethod
-    def get_vertices(folder: Path, rng: np.random.Generator):
+    def _get_vertices(rng: np.random.Generator, folder: Path):
         if not gowalla_data_exists(folder):
             create_gowalla_data(rng, folder)
         with open(folder / SAVED_VERTEX_FILENAME, "rb") as file:
@@ -274,10 +275,10 @@ class _GowallaVertexGen(VertexSetGen):
 class _GowallaWeightGen(WeightGen):
     """Reads the Gowalla graph's weights from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
-        self._function = lambda vertices, rng: self.get_weights(folder, vertices, rng)
+        self._function = functools.partial(self._get_weights, folder=folder)
 
     @staticmethod
-    def get_weights(folder: Path, _: VertexSet, rng: np.random.Generator):
+    def _get_weights(_: VertexSet, rng: np.random.Generator, folder: Path):
         if not gowalla_data_exists(folder):
             create_gowalla_data(rng, folder)
         with open(folder / SAVED_WEIGHT_FILENAME, "rb") as file:
@@ -287,10 +288,10 @@ class _GowallaWeightGen(WeightGen):
 class _GowallaEdgeGen(EdgeGen):
     """Reads the Gowalla graph's edges from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
-        self._function = lambda vertices, rng: self.get_edges(folder, vertices, rng)
+        self._function = functools.partial(self._get_edges, folder=folder)
 
     @staticmethod
-    def get_edges(folder: Path, _: WeightedVertexSet, rng: np.random.Generator):
+    def _get_edges(_: WeightedVertexSet, rng: np.random.Generator, folder: Path):
         if not gowalla_data_exists(folder):
             create_gowalla_data(rng, folder)
         with open(folder / SAVED_EDGE_FILENAME, "rb") as file:

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import functools
 from pathlib import Path
 from typing import Any, Mapping, List, Sequence
 
@@ -107,11 +108,10 @@ class PowerLawWeightGen(WeightGen):
         self.ell = ell
         if tau <= 2:
             raise ValueError("tau must be greater than 2 for the expected degrees to be finite.")
-
-        self._function = lambda vertices, rng: self._power_law_sample(vertices=vertices, tau=tau, scaling=ell, rng=rng)
+        self._function = functools.partial(self._power_law_sample, tau=tau, scaling=ell)
 
     @staticmethod
-    def _power_law_sample(vertices: VertexSet, tau: float, scaling: EdgeWeightScaler, rng: np.random.Generator) \
+    def _power_law_sample(vertices: VertexSet, rng: np.random.Generator, tau: float, scaling: EdgeWeightScaler) \
             -> List[float]:
         """Samples weights W for the given VertexSet i.i.d. from a power law, taking Pr(W >= x) = 1 / x^{\tau - 1}
         and using the specified RNG, then applies the given scaling map to each weight."""

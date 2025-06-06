@@ -1,4 +1,5 @@
 from __future__ import annotations
+import functools
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple
 
@@ -304,31 +305,34 @@ class GirgGen(EdgeGen):
     n points then we might end up with points outside [0, 1]^d and the generation code will crash. So instead we pass
     1/n^{1/d} in as the scale_factor argument."""
     def __init__(self, alpha: float, scale_factor: float, average_degree: Optional[float] = None) -> None:
-        def _function(vertex_set: WeightedVertexSet, rng: np.random.Generator) -> List[Tuple[Any, Any]]:
-            seed = rng.integers(low=0, high=2 ** 31)  # girg-sampling takes 31-bit seeds, "high" is not inclusive.
-            weights = [vertex_set.weight(i) for i in range(vertex_set.size)]
-
-            """The GIRG generator creates a GIRG with connection probability between u and v given by max(1, 
-            W_uW_v/n|u-v|^d)^alpha. It also requires all points to lie in [0,1]^d. So we need to scale everything down 
-            by a factor of n^{1/d}."""
-            positions = [vertex_set.id_to_position(i) for i in range(vertex_set.size)]
-            scaled_positions = []
-            for position in positions:
-                scaled_position = [position[i] * scale_factor for i in range(vertex_set.dimension)]
-                scaled_positions.append(scaled_position)
-
-            if average_degree is not None:
-                c = gs.scaleWeights(weights=weights, desiredAvgDegree=average_degree, dimension=vertex_set.dimension,
-                                    alpha=alpha)
-                weights = [c * weight for weight in weights]
-
-            return gs.generateEdges(weights=weights, positions=scaled_positions, alpha=alpha,
-                                    scale=scale_factor ** vertex_set.dimension, seed=seed)
-
-        self._function = _function
+        self._function = functools.partial(self._sample_edges, alpha=alpha, scale_factor=scale_factor,
+                                           average_degree=average_degree)
         self.alpha = alpha
         self.scale_factor = scale_factor
         self.average_degree = average_degree
+
+    @staticmethod
+    def _sample_edges(vertex_set: WeightedVertexSet, rng: np.random.Generator, alpha: float, scale_factor: float,
+                      average_degree: Optional[float]) -> List[Tuple[Any, Any]]:
+        seed = rng.integers(low=0, high=2 ** 31)  # girg-sampling takes 31-bit seeds, "high" is not inclusive.
+        weights = [vertex_set.weight(i) for i in range(vertex_set.size)]
+
+        """The GIRG generator creates a GIRG with connection probability between u and v given by max(1, 
+        W_uW_v/n|u-v|^d)^alpha. It also requires all points to lie in [0,1]^d. So we need to scale everything down 
+        by a factor of n^{1/d}."""
+        positions = [vertex_set.id_to_position(i) for i in range(vertex_set.size)]
+        scaled_positions = []
+        for position in positions:
+            scaled_position = [position[i] * scale_factor for i in range(vertex_set.dimension)]
+            scaled_positions.append(scaled_position)
+
+        if average_degree is not None:
+            c = gs.scaleWeights(weights=weights, desiredAvgDegree=average_degree, dimension=vertex_set.dimension,
+                                alpha=alpha)
+            weights = [c * weight for weight in weights]
+
+        return gs.generateEdges(weights=weights, positions=scaled_positions, alpha=alpha,
+                                scale=scale_factor ** vertex_set.dimension, seed=seed)
 
 
 class FixedGraphGen(EdgeGen):
