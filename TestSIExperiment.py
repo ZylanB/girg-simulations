@@ -53,7 +53,7 @@ class FileIOTests(unittest.TestCase):
     def setUp(self):
         self.log_path = Path.cwd() / "test_files"
         self.log_path.mkdir(parents=True, exist_ok=True)
-        self.clearTestFiles()
+        self.clear_test_files()
 
         self.entropy = 99217604857427484066604220485342406204
         self.rng = np.random.default_rng(seed=self.entropy)
@@ -73,15 +73,15 @@ class FileIOTests(unittest.TestCase):
         self.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
 
     def tearDown(self):
-        self.clearTestFiles()
+        self.clear_test_files()
 
-    def clearTestFiles(self):
+    def clear_test_files(self):
         # Clear out existing files from previous tests to make sure new ones are created.
         for child in self.log_path.iterdir():
             if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
                 child.unlink()
 
-    def testExecute(self):
+    def test_execute(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
                                   name="test", result_fn=self.result_fn, resample_vertices=False,
@@ -89,7 +89,7 @@ class FileIOTests(unittest.TestCase):
         experiment.execute()
         self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
 
-    def testBasicLog(self):
+    def test_basic_log(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
                                   name="test", result_fn=self.result_fn, resample_vertices=False,
@@ -109,7 +109,7 @@ class FileIOTests(unittest.TestCase):
 
         self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
 
-    def testFullLog(self):
+    def test_full_log(self):
         saved_experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
                                   name="test", result_fn=self.result_fn, resample_vertices=True,
@@ -142,7 +142,7 @@ class FileIOTests(unittest.TestCase):
             loaded_edges = {(int(e.source()), int(e.target())) for e in loaded_run.graph.edges()}
             self.assertEqual(original_edges, loaded_edges)
 
-    def testConfig(self):
+    def test_config(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
                                   name="test", result_fn=self.result_fn, seed=self.entropy, resample_vertices=False,
@@ -164,7 +164,7 @@ class FileIOTests(unittest.TestCase):
         self.assertEqual(loaded_experiment.name, experiment.name)
         self.assertEqual(loaded_experiment.results, experiment.results)
 
-    def testConfigFormat(self):
+    def test_config_format(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
                                   name="test", result_fn=self.result_fn, seed=self.entropy, resample_vertices=False,
