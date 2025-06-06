@@ -6,47 +6,63 @@ import numpy as np
 
 from SIEpidemic import SIEpidemic, GenericEdgeCostGen, GenericEdgeGen
 from SIExperiment import SIExperiment, GenericInitialVertexFunction, GenericResultFunction
-from VertexSet import Lattice
+from VertexSet import GenericVertexSetGen, FixedVertexSet, EuclideanDistance
 from WeightedVertexSet import WeightedVertexSet, GenericWeightGen
 
 
-def _dummy_weight_gen(_, __):
-    _dummy_weight_gen.x += 1
-    return [_dummy_weight_gen.x, _dummy_weight_gen.x + .25, _dummy_weight_gen.x + .5,
-            _dummy_weight_gen.x + .75]
+"""These dummy generator functions must all be defined outside the test class or their closure will include the test 
+class, which in turn includes an epidemic, which in turn includes a graph-tools graph. This means that when they get 
+pickled as part of SIEpidemic.save_config, dill pickles their closure along with them, pickling a graph-tools graph 
+and raising an exception. This only matters when writing unit tests."""
 
 
-_dummy_weight_gen.x = -1  # type: ignore
+def _test_weight_gen(vertices, _):
+    _test_weight_gen.x += 1
+    return [_test_weight_gen.x + .25 * i for i in range(vertices.size)]
 
-_graphs = [[],
+
+_test_weight_gen.x = -1  # type: ignore
+
+_graphs = [[(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)],
+           [],
            [(0, 1)],
            [(0, 1), (0, 2)],
            [(0, 1), (0, 2), (1, 2)],
            [(0, 1), (0, 2), (1, 2), (0, 3)],
-           [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)],
-           [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]]
+           [(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)]]
 
 
-def _dummy_edge_gen(_, __):
-    _dummy_edge_gen.x += 1
-    return _graphs[_dummy_edge_gen.x]
+def _test_edge_gen(_, __):
+    _test_edge_gen.x += 1
+    return _graphs[_test_edge_gen.x]
 
 
-_dummy_edge_gen.x = -1  # type: ignore
+_test_edge_gen.x = -1  # type: ignore
 
 
-def _dummy_cost_gen(_):
-    _dummy_cost_gen.x += 1
-    return _dummy_cost_gen.x
+def _test_cost_gen(_):
+    _test_cost_gen.x += 1
+    return _test_cost_gen.x
 
 
-_dummy_cost_gen.x = -1  # type: ignore
+_test_cost_gen.x = -1  # type: ignore
+
+
+def _test_vertex_gen(_):
+    _test_vertex_gen.x += 1
+    vertices = {i: (float(i),) for i in range(_test_vertex_gen.x)}
+    vertex_set = FixedVertexSet(vertices, metric=EuclideanDistance(d=1), description="test")(_)
+    return vertex_set
+
+
+_test_vertex_gen.x = 3  # type: ignore
 
 
 def _reset_gen_globals() -> None:
-    _dummy_edge_gen.x = -1  # type: ignore
-    _dummy_weight_gen.x = -1  # type: ignore
-    _dummy_cost_gen.x = -1  # type: ignore
+    _test_edge_gen.x = -1  # type: ignore
+    _test_weight_gen.x = -1  # type: ignore
+    _test_cost_gen.x = -1  # type: ignore
+    _test_vertex_gen.x = 3  # type: ignore
 
 
 class FileIOTests(unittest.TestCase):
@@ -60,17 +76,22 @@ class FileIOTests(unittest.TestCase):
 
         _reset_gen_globals()
 
-        weight_gen = GenericWeightGen(_dummy_weight_gen, "Test weight generator")
-        edge_gen = GenericEdgeGen(_dummy_edge_gen, "Test edge generator")
-        cost_gen = GenericEdgeCostGen(_dummy_cost_gen, "Test cost generator")
+        self.varying_weight_gen = GenericWeightGen(_test_weight_gen, "Varying test weight generator")
+        self.varying_edge_gen = GenericEdgeGen(_test_edge_gen, "Varying test edge generator")
+        self.varying_cost_gen = GenericEdgeCostGen(_test_cost_gen, "Varying test cost generator")
+        self.varying_vertex_gen = GenericVertexSetGen(_test_vertex_gen, "Varying test vertex generator")
 
-        vertex_gen = Lattice(dimension=2, size=2)
-        vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=self.rng)
-        self.epidemic = SIEpidemic(vertex_set=vertices, edge_cost_gen=cost_gen, rng=self.rng,
-                                   edge_gen=edge_gen, mu=0.5, zeta=1.5, name="test")
+        self.vertices = WeightedVertexSet(vertex_gen=self.varying_vertex_gen, weight_gen=self.varying_weight_gen,
+                                          rng=self.rng)
+        self.epidemic = SIEpidemic(vertex_set=self.vertices, edge_cost_gen=self.varying_cost_gen, rng=self.rng,
+                                   edge_gen=self.varying_edge_gen, mu=1., zeta=1., name="test")
 
         self.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
-        self.result_fn = GenericResultFunction(lambda graph, gen: graph.num_edges(), "Edge count")
+        self.edge_count = GenericResultFunction(lambda epi, _: epi.graph.num_edges(), "Edge count")
+        self.total_weight = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
+        self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.size, description="Vertex count")
+        self.total_cost = GenericResultFunction(lambda epi, _: sum([epi.edge_costs[e] for e in epi.graph.edges()]),
+                                                description="Total edge cost")
 
     def tearDown(self):
         self.clear_test_files()
@@ -82,17 +103,113 @@ class FileIOTests(unittest.TestCase):
                 child.unlink()
 
     def test_execute(self):
-        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=1, resample_edges=False, resample_costs=False,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.result_fn, resample_vertices=False,
+                                  name="test", result_fn=self.edge_count, resample_vertices=False,
                                   resample_weights=False)
         experiment.execute()
-        self.assertEqual(experiment.results, [0, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(experiment.results, [6])
+
+    def test_no_resample_edges(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.edge_count, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [6, 6, 6, 6, 6, 6, 6])
+
+    def test_resample_edges(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.edge_count, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [6, 0, 1, 2, 3, 4, 5])
+
+    def test_resampling_vertices_resamples_edges(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.edge_count, resample_vertices=True,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [6, 0, 1, 2, 3, 4, 5])
+
+    def test_no_resample_costs(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.total_cost, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75])
+
+    def test_resample_costs(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=True,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.total_cost, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [.125*(6*i+3) + .375*(6*i+4) + .375*(6*i+5) for i in range(7)])
+
+    def test_resampling_edges_resamples_costs(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test_2", result_fn=self.total_cost, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [3.75, 0., 0., 0., .125*11, .125*15, .125*19+.375*20])
+
+    def test_resampling_vertices_resamples_costs(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test_3", result_fn=self.total_cost, resample_vertices=True,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [3.75, 0, 27.0, 236.25, 723.375, 2670.625, 6572.375])
+
+    def test_no_resample_weights(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.total_weight, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5])
+
+    def test_resample_weights(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.total_weight, resample_vertices=False,
+                                  resample_weights=True)
+        experiment.execute()
+        self.assertEqual(experiment.results, [1.5, 5.5, 9.5, 13.5, 17.5, 21.5, 25.5])
+
+    def test_resampling_vertices_resamples_weights(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.total_weight, resample_vertices=True,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [sum([i + x*.25 for x in range(i+4)]) for i in range(7)])
+
+    def test_no_resample_vertices(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.vertex_count, resample_vertices=False,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [4, 4, 4, 4, 4, 4, 4])
+
+    def test_resample_vertices(self):
+        experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
+                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
+                                  name="test", result_fn=self.vertex_count, resample_vertices=True,
+                                  resample_weights=False)
+        experiment.execute()
+        self.assertEqual(experiment.results, [4, 5, 6, 7, 8, 9, 10])
 
     def test_basic_log(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.result_fn, resample_vertices=False,
+                                  name="test", result_fn=self.edge_count, resample_vertices=False,
                                   resample_weights=False)
         experiment.execute()
 
@@ -107,13 +224,13 @@ class FileIOTests(unittest.TestCase):
             self.assertFalse((self.log_path / f"test-graph-run-{i}.gt").exists())
         self.assertFalse((self.log_path / f"test-vertices.pickle").exists())
 
-        self.assertEqual(experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(experiment.load_results(), [6, 0, 1, 2, 3, 4, 5])
 
     def test_full_log(self):
         saved_experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
-                                  initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
-                                  name="test", result_fn=self.result_fn, resample_vertices=True,
-                                  resample_weights=False)
+                                        initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
+                                        name="test", result_fn=self.edge_count, resample_vertices=True,
+                                        resample_weights=False)
         saved_experiment.save_config()
         saved_experiment.execute()
 
@@ -130,13 +247,13 @@ class FileIOTests(unittest.TestCase):
 
         loaded_experiment = SIExperiment.load_from_file(folder=self.log_path, name="test", rerun=False)
 
-        self.assertEqual(loaded_experiment.results, [0, 1, 2, 3, 4, 5, 6])
-        self.assertEqual(loaded_experiment.load_results(), [0, 1, 2, 3, 4, 5, 6])
+        self.assertEqual(loaded_experiment.results, [6, 0, 1, 2, 3, 4, 5])
+        self.assertEqual(loaded_experiment.load_results(), [6, 0, 1, 2, 3, 4, 5])
 
         for i in range(7):
             loaded_run = loaded_experiment.load_run(i)
-            self.assertEqual(self.epidemic.mu, 0.5)
-            self.assertEqual(self.epidemic.zeta, 1.5)
+            self.assertEqual(self.epidemic.mu, 1.)
+            self.assertEqual(self.epidemic.zeta, 1.)
 
             original_edges = set(_graphs[i])
             loaded_edges = {(int(e.source()), int(e.target())) for e in loaded_run.graph.edges()}
@@ -145,8 +262,8 @@ class FileIOTests(unittest.TestCase):
     def test_config(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=True,
-                                  name="test", result_fn=self.result_fn, seed=self.entropy, resample_vertices=False,
-                                  resample_weights=False)
+                                  name="test", result_fn=self.edge_count, seed=self.entropy, resample_vertices=True,
+                                  resample_weights=True)
         experiment.save_config()
         experiment.execute()
 
@@ -159,6 +276,8 @@ class FileIOTests(unittest.TestCase):
         self.assertEqual(loaded_experiment.run_count, experiment.run_count)
         self.assertEqual(loaded_experiment.resample_edges, experiment.resample_edges)
         self.assertEqual(loaded_experiment.resample_costs, experiment.resample_costs)
+        self.assertEqual(loaded_experiment.resample_vertices, experiment.resample_vertices)
+        self.assertEqual(loaded_experiment.resample_weights, experiment.resample_weights)
         self.assertEqual(loaded_experiment.log_path, experiment.log_path)
         self.assertEqual(loaded_experiment.full_log, experiment.full_log)
         self.assertEqual(loaded_experiment.name, experiment.name)
@@ -167,7 +286,7 @@ class FileIOTests(unittest.TestCase):
     def test_config_format(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=True, resample_costs=True,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.result_fn, seed=self.entropy, resample_vertices=False,
+                                  name="test", result_fn=self.edge_count, seed=self.entropy, resample_vertices=False,
                                   resample_weights=False)
         experiment.save_config()
         with open(self.log_path / "test-experiment-settings.cfg") as f:
@@ -182,26 +301,24 @@ class FileIOTests(unittest.TestCase):
             resample_weights==False
             resample_vertices==False
             seed==99217604857427484066604220485342406204
-            mu==0.5
-            zeta==1.5
+            mu==1.0
+            zeta==1.0
             Initial vertex selector of type <class 'SIExperiment.GenericInitialVertexFunction'>:
             \tdescription==Zero vertex
             Test result extractor of type <class 'SIExperiment.GenericResultFunction'>:
             \tdescription==Edge count
             Edge cost generator of type <class 'SIEpidemic.GenericEdgeCostGen'>:
-            \tdescription==Test cost generator
+            \tdescription==Varying test cost generator
             Edge set generator of type <class 'SIEpidemic.GenericEdgeGen'>:
-            \tdescription==Test edge generator
+            \tdescription==Varying test edge generator
             Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGen'>:
-            \tdescription==Test weight generator
-            Distance function on vertex set of type <class 'VertexSet.TorusDistance'>:
-            \tdimension==2
-            \tsize==2
-            Vertex set generator of type <class 'VertexSet.Lattice'>:
-            \tsize==2
-            \tdimension==2
+            \tdescription==Varying test weight generator
+            Distance function on vertex set of type <class 'VertexSet.EuclideanDistance'>:
+            \tdimension==1
+            Vertex set generator of type <class 'VertexSet.GenericVertexSetGen'>:
+            \tdescription==Varying test vertex generator
             Vertex weight generator of type <class 'WeightedVertexSet.GenericWeightGen'>:
-            \tdescription==Test weight generator
+            \tdescription==Varying test weight generator
             """)
         self.assertEqual(saved_settings, expected_cfg)
 
