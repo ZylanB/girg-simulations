@@ -86,9 +86,9 @@ class FileIOTests(unittest.TestCase):
         self.epidemic = SIEpidemic(vertex_set=self.vertices, edge_cost_gen=self.varying_cost_gen, rng=self.rng,
                                    edge_gen=self.varying_edge_gen, mu=1., zeta=1., name="test")
 
-        self.initial_vertex_fn = GenericInitialVertexFunction(lambda gen: 0, "Zero vertex")
+        self.initial_vertex_fn = GenericInitialVertexFunction(lambda _: 0, "Zero vertex")
         self.edge_count = GenericResultFunction(lambda epi, _: epi.graph.num_edges(), "Edge count")
-        self.total_weight = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
+        self.sum_weights = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
         self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.size, description="Vertex count")
         self.total_cost = GenericResultFunction(lambda epi, _: sum([epi.edge_costs[e] for e in epi.graph.edges()]),
                                                 description="Total edge cost")
@@ -169,7 +169,7 @@ class FileIOTests(unittest.TestCase):
     def test_no_resample_weights(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.total_weight, resample_vertices=False,
+                                  name="test", result_fn=self.sum_weights, resample_vertices=False,
                                   resample_weights=False)
         experiment.execute()
         self.assertEqual(experiment.results, [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5])
@@ -177,7 +177,7 @@ class FileIOTests(unittest.TestCase):
     def test_resample_weights(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.total_weight, resample_vertices=False,
+                                  name="test", result_fn=self.sum_weights, resample_vertices=False,
                                   resample_weights=True)
         experiment.execute()
         self.assertEqual(experiment.results, [1.5, 5.5, 9.5, 13.5, 17.5, 21.5, 25.5])
@@ -185,7 +185,7 @@ class FileIOTests(unittest.TestCase):
     def test_resampling_vertices_resamples_weights(self):
         experiment = SIExperiment(epidemic=self.epidemic, run_count=7, resample_edges=False, resample_costs=False,
                                   initial_vertex_fn=self.initial_vertex_fn, log_path=self.log_path, full_log=False,
-                                  name="test", result_fn=self.total_weight, resample_vertices=True,
+                                  name="test", result_fn=self.sum_weights, resample_vertices=True,
                                   resample_weights=False)
         experiment.execute()
         self.assertEqual(experiment.results, [sum([i + x*.25 for x in range(i+4)]) for i in range(7)])
