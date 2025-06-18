@@ -259,7 +259,7 @@ class GowallaDataCreator:
         return edge_list
 
 
-class _GowallaVertexGen(VertexSetGen):
+class GowallaVertexGen(VertexSetGen):
     """Reads the Gowalla graph's vertices from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
         self._function = functools.partial(self._get_vertices, folder=folder)
@@ -272,7 +272,7 @@ class _GowallaVertexGen(VertexSetGen):
             return dill.load(file)
 
 
-class _GowallaWeightGen(WeightGen):
+class GowallaWeightGen(WeightGen):
     """Reads the Gowalla graph's weights from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
         self._function = functools.partial(self._get_weights, folder=folder)
@@ -285,7 +285,7 @@ class _GowallaWeightGen(WeightGen):
             return dill.load(file)
 
 
-class _GowallaEdgeGen(EdgeGen):
+class GowallaEdgeGen(EdgeGen):
     """Reads the Gowalla graph's edges from file, first creating them with GowallaDataCreator if necessary."""
     def __init__(self, folder: Path):
         self._function = functools.partial(self._get_edges, folder=folder)
@@ -303,9 +303,9 @@ class GowallaSIEpidemic(SIEpidemic):
     GowallaDataCreator if needed, otherwise just unpickles it."""
     def __init__(self, cost_gen: EdgeCostGen, mu: float, zeta: float, name: str, rng: np.random.Generator,
                  gowalla_folder: Path = DEFAULT_SAVE_FOLDER):
-        vertex_gen = _GowallaVertexGen(gowalla_folder)
-        weight_gen = _GowallaWeightGen(gowalla_folder)
-        edge_gen = _GowallaEdgeGen(gowalla_folder)
+        vertex_gen = GowallaVertexGen(gowalla_folder)
+        weight_gen = GowallaWeightGen(gowalla_folder)
+        edge_gen = GowallaEdgeGen(gowalla_folder)
 
         vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
         super().__init__(vertex_set=vertex_set, cost_gen=cost_gen, edge_gen=edge_gen, mu=mu, zeta=zeta,
