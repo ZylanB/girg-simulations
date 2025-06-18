@@ -72,8 +72,8 @@ class GowallaDataCreator:
     EDGE_FILENAME are the filenames to save the processed vertex and edge data to."""
     _VERTEX_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_totalCheckins.txt.gz"
     _EDGE_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_edges.txt.gz"
-    _VERTEX_DATA_PATH = Path.cwd() / "Gowalla_totalCheckins.txt"
-    _EDGE_DATA_PATH = Path.cwd() / "Gowalla_edges.txt"
+    _VERTEX_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_totalCheckins.txt"
+    _EDGE_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_edges.txt"
 
     def __init__(self, rng: np.random.Generator, folder: Path):
         self.vertex_path = folder / SAVED_VERTEX_FILENAME

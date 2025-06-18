@@ -26,7 +26,7 @@ def single_heatmap(size,tau,alpha,mu, vertex_set = "Z2", title = "0", savefig = 
         case "PPP":
             g,pos,st,w,L_rv,distL = bf.PPPGirg(size,2,tau,alpha,deg,seed)
             infs,tc,noInfecs = bf.infectionSpread(g,st,w,L_rv,mu,vertex_set,ratio,origin_index,method)
-            heatmap_matrix = bf.setLattice(size,g,pos,infs,noInfecs,mu)
+            heatmap_matrix = bf.setLattice(size,g,pos,infs,noInfecs)
 
             if savefig:
                 fig = plt.figure(figsize=(14,14))
@@ -34,8 +34,10 @@ def single_heatmap(size,tau,alpha,mu, vertex_set = "Z2", title = "0", savefig = 
                 colors2 = plt.cm.Reds(np.linspace(0,1,1))
                 colors = np.vstack((colors2,colors1))
                 mymap = mcolors.LinearSegmentedColormap.from_list('my_cmap',colors)
-                bf.draw(heatmap_matrix,title,cmap = mymap)
+                bf.draw(heatmap_matrix,title,cmap = mymap,interpolation="sinc")
                 fig.savefig("Heatmap_" + str(title))
+                bf.draw(heatmap_matrix,title,cmap = mymap,interpolation="none")
+                fig.savefig("Heatmap_none")
 
     if not savefig:
         return heatmap_matrix
