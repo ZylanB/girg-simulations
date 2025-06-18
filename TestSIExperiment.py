@@ -372,8 +372,4 @@ def clear_test_files():
 
 
 if __name__ == '__main__':
-    # suite = unittest.TestSuite()
-    # suite.addTest(FileIOTests("test_config"))
-    # runner = unittest.TextTestRunner()
-    # runner.run(suite)
     unittest.main()

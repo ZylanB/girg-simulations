@@ -4,6 +4,7 @@ import unittest
 
 from scipy.stats import poisson  # type: ignore
 
+
 def sample_tvd(sample_data: Dict[int, int], pmf: Callable[[int], float]):
     r"""Given a probability mass function F and sample data with sample mass function F', returns
     sup_x (F'(x) - F(x)). Assumes that F(x) = 0 for all x < 0."""
