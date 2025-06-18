@@ -140,7 +140,7 @@ class GenerationTests(unittest.TestCase):
         self.instance.save_files()
         edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should load the Gowalla dataset we just saved. If it doesn't, the result will differ due to different seeds.
-        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
+        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng(), gowalla_folder=TEST_SAVE_FOLDER)
         self.check_against_instance(test_epidemic)
         test_epidemic.save_config(TEST_SAVE_FOLDER)
@@ -161,7 +161,7 @@ class GenerationTests(unittest.TestCase):
         clear_test_files()
         edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should recreate the Gowalla dataset with the same RNG seed as in setup, then save it, then load it.
-        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
+        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng(seed=self.entropy), gowalla_folder=TEST_SAVE_FOLDER)
         self.check_against_instance(test_epidemic)
         clear_test_files()
@@ -192,7 +192,7 @@ class GraphTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(edge_cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
+        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
                                           rng=np.random.default_rng())
         cls.vertex_set = test_epidemic.vertex_set
         cls.graph = test_epidemic.graph

@@ -301,14 +301,14 @@ class _GowallaEdgeGen(EdgeGen):
 class GowallaSIEpidemic(SIEpidemic):
     """An SIEpidemic on the Gowalla graph. Creates the Gowalla data from scratch in the given folder using a
     GowallaDataCreator if needed, otherwise just unpickles it."""
-    def __init__(self, edge_cost_gen: EdgeCostGen, mu: float, zeta: float, name: str, rng: np.random.Generator,
+    def __init__(self, cost_gen: EdgeCostGen, mu: float, zeta: float, name: str, rng: np.random.Generator,
                  gowalla_folder: Path = DEFAULT_SAVE_FOLDER):
         vertex_gen = _GowallaVertexGen(gowalla_folder)
         weight_gen = _GowallaWeightGen(gowalla_folder)
         edge_gen = _GowallaEdgeGen(gowalla_folder)
 
         vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
-        super().__init__(vertex_set=vertex_set, edge_cost_gen=edge_cost_gen, edge_gen=edge_gen, mu=mu, zeta=zeta,
+        super().__init__(vertex_set=vertex_set, cost_gen=cost_gen, edge_gen=edge_gen, mu=mu, zeta=zeta,
                          rng=rng, name=name)
 
 

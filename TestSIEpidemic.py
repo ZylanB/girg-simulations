@@ -40,11 +40,11 @@ class BasicTests(unittest.TestCase):
         cost_gen = ConstantCostGen(1.)
 
         self.unpenalised_epidemic = SIEpidemic(vertex_set=vertices, edge_gen=edge_gen, name="test", mu=0., zeta=0.,
-                                               edge_cost_gen=cost_gen, rng=np.random.default_rng())
+                                               cost_gen=cost_gen, rng=np.random.default_rng())
         self.unpenalised_epidemic.run_infection(self.a_id)
 
         self.penalised_epidemic = SIEpidemic(vertex_set=vertices, edge_gen=edge_gen, name="test", mu=self.mu,
-                                             zeta=self.zeta, edge_cost_gen=cost_gen, rng=np.random.default_rng())
+                                             zeta=self.zeta, cost_gen=cost_gen, rng=np.random.default_rng())
         self.penalised_epidemic.run_infection(self.a_id)
 
     def test_unpenalised_properties(self):
@@ -200,7 +200,7 @@ class GIRGTests(unittest.TestCase):
         vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
 
         graph_gen = GirgGen(alpha=self.alpha, scale_factor=.25)
-        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_gen=ConstantCostGen(0.),
+        epidemic = SIEpidemic(vertex_set=vertices, cost_gen=ConstantCostGen(0.),
                               edge_gen=graph_gen, mu=0., zeta=0., rng=rng, name="test")
 
         vertex_a = epidemic.graph.vertex(0)
@@ -261,7 +261,7 @@ class GIRGTests(unittest.TestCase):
         vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
 
         graph_gen = GirgGen(alpha=self.alpha, scale_factor=1 / 3)
-        epidemic = SIEpidemic(vertex_set=vertices, edge_cost_gen=ConstantCostGen(0.), edge_gen=graph_gen, mu=0.,
+        epidemic = SIEpidemic(vertex_set=vertices, cost_gen=ConstantCostGen(0.), edge_gen=graph_gen, mu=0.,
                               zeta=0., name="test", rng=rng)
 
         vertex_a = epidemic.graph.vertex(0)
@@ -344,7 +344,7 @@ class FileIOTests(unittest.TestCase):
         vertices = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
         cost_gen = FPPCostGen(lambda_=1.)
         edge_gen = GirgGen(alpha=1.8, scale_factor=1 / 100)
-        saved_value = SIEpidemic(vertex_set=vertices, edge_cost_gen=cost_gen, edge_gen=edge_gen, mu=1., zeta=0.5,
+        saved_value = SIEpidemic(vertex_set=vertices, cost_gen=cost_gen, edge_gen=edge_gen, mu=1., zeta=0.5,
                                  rng=rng, name="test")
         saved_value.run_infection(np.random.randint(10000))
 

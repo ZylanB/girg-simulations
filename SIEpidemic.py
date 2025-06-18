@@ -48,10 +48,10 @@ class SIEpidemic:
     should return a sample of the *random* part of an edge's cost, i.e. not including degree or spatial penalties
     (which are calculated in WeightedVertexSet). Mu should be the weight penalty, and zeta should be the spatial
     penalty. Name determines the filenames used for logging."""
-    def __init__(self, vertex_set: WeightedVertexSet, edge_cost_gen: EdgeCostGen, mu: float, zeta: float,
+    def __init__(self, vertex_set: WeightedVertexSet, cost_gen: EdgeCostGen, mu: float, zeta: float,
                  edge_gen: EdgeGen, name: str, rng: np.random.Generator) -> None:
         self.vertex_set = vertex_set
-        self.edge_cost_gen = edge_cost_gen
+        self.cost_gen = cost_gen
         self.edge_gen = edge_gen
         self.mu = mu
         self.zeta = zeta
@@ -86,7 +86,7 @@ class SIEpidemic:
         for edge in self.graph.edges():
             u_id = self.graph.vertex_index[edge.source()]
             v_id = self.graph.vertex_index[edge.target()]
-            new_cost = self.edge_cost_gen(rng)
+            new_cost = self.cost_gen(rng)
             new_cost *= self.vertex_set.penalty(u_id, v_id, mu=self.mu, zeta=self.zeta)
             self.edge_costs[edge] = new_cost
 
@@ -196,7 +196,7 @@ class SIEpidemic:
         on run_index. This is often significantly more space-efficient and faster."""
         with open(folder / self.config_filename, "wb") as file:
             dill.dump(self.edge_gen, file, protocol=dill.HIGHEST_PROTOCOL)
-            dill.dump(self.edge_cost_gen, file, protocol=dill.HIGHEST_PROTOCOL)
+            dill.dump(self.cost_gen, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.mu, file, protocol=dill.HIGHEST_PROTOCOL)
             dill.dump(self.zeta, file, protocol=dill.HIGHEST_PROTOCOL)
         self.vertex_set.save_config(folder / self.vertex_config_filename)
@@ -220,7 +220,7 @@ class SIEpidemic:
                                               rng=np.random.default_rng())
         edge_gen = FixedGraphGen(edges=[], description="Empty graph")
         cost_gen = ConstantCostGen(c=0)
-        return SIEpidemic(vertex_set=weighted_vertices, edge_cost_gen=cost_gen, edge_gen=edge_gen, mu=0., zeta=0.,
+        return SIEpidemic(vertex_set=weighted_vertices, cost_gen=cost_gen, edge_gen=edge_gen, mu=0., zeta=0.,
                           name=name, rng=np.random.default_rng())
 
     @classmethod
@@ -233,7 +233,7 @@ class SIEpidemic:
         try:
             with open(folder / return_value.config_filename, "rb") as file:
                 return_value.edge_gen = dill.load(file)
-                return_value.edge_cost_gen = dill.load(file)
+                return_value.cost_gen = dill.load(file)
                 return_value.mu = dill.load(file)
                 return_value.zeta = dill.load(file)
         except Exception:
@@ -258,7 +258,7 @@ class SIEpidemic:
         try:
             with open(folder / return_value.config_filename, "rb") as file:
                 return_value.edge_gen = dill.load(file)
-                return_value.edge_cost_gen = dill.load(file)
+                return_value.cost_gen = dill.load(file)
                 return_value.mu = dill.load(file)
                 return_value.zeta = dill.load(file)
         except Exception:
