@@ -2,41 +2,52 @@ from __future__ import annotations
 from collections import defaultdict
 import datetime
 from dataclasses import dataclass
-import functools
 import gzip
 from pathlib import Path
 import shutil
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, Type
 
 import dill  # type: ignore
 import matplotlib.pyplot as plt
 import numpy as np
 import requests
 
-from SIEpidemic import SIEpidemic, EdgeGen, EdgeCostGen
+from PresetGraph import PresetGraph, PresetGen
+from SIEpidemic import GirgGen
 from SIExperiment import InitialVertexFunction
-from VertexSet import EarthDistance, VertexSet, VertexSetGen
-from WeightedVertexSet import WeightedVertexSet, WeightGen
-
-# Locations to store saved vertex and edge data after creation.
-DEFAULT_SAVE_FOLDER = Path.cwd() / "gowalla_data"
-SAVED_VERTEX_FILENAME = "vertices.pickle"
-SAVED_WEIGHT_FILENAME = "weights.pickle"
-SAVED_EDGE_FILENAME = "edges.pickle"
-
+from VertexSet import EarthDistance, VertexSet, PoissonPointProcess
+from WeightedVertexSet import PowerLawWeightGen, IdentityWeightScaler, WeightedVertexSet
 
 # Parameter values for synthetic GIRGs to mimic Gowalla.
 GOWALLA_ALPHA = 1.17
 GOWALLA_TAU = 2.8
 
 
-def gowalla_data_exists(folder: Path) -> bool:
-    return (folder / SAVED_VERTEX_FILENAME).exists() and (folder / SAVED_EDGE_FILENAME).exists()
+def obtain_data_file(url: str, dest_path: Path):
+    """Downloads the given .gz (not .tar.gz) file from the given URL, unzips it in the given folder to the given
+    name, and deletes the original .gz file."""
+    dest_folder = dest_path.parent
+    dest_folder.mkdir(parents=True, exist_ok=True)
 
+    local_file = dest_folder / Path(url).name
+    print(f"Downloading from {url} to {local_file}...")
 
-def create_gowalla_data(rng: np.random.Generator, folder: Path = DEFAULT_SAVE_FOLDER) -> None:
-    creator = GowallaDataCreator(folder=folder, rng=rng)
-    creator.save_files()
+    with requests.get(url, stream=True) as response:
+        response.raise_for_status()
+        with local_file.open("wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+    print("Download completed.")
+
+    print("Extracting archive...")
+    with gzip.open(local_file, "rb") as gz, open(dest_path, "wb") as out:
+        shutil.copyfileobj(gz, out)  # type: ignore
+    print("Extraction completed.")
+
+    print(f"Deleting temporary file {local_file}...")
+    local_file.unlink()
+    print("Temporary file deleted.")
 
 
 @dataclass(slots=True)
@@ -72,7 +83,21 @@ class TieDatum:
         return max([d(x, y) for x in self.modal_positions for y in self.modal_positions])
 
 
-class GowallaDataCreator:
+class GowallaGraph(PresetGraph):
+    @property
+    def description(self) -> str:
+        return "Preset graph generated from the Gowalla dataset with the GowallaGen class."
+
+    @property
+    def DEFAULT_SEED(self) -> int:
+        return 300574007011361565096923362210003471256
+
+    @property
+    def graph_generator_class(self) -> Type[PresetGen]:
+        return GowallaGen
+
+
+class GowallaGen(PresetGen):
     """Creates the Gowalla dataset from scratch, downloading the relevant files from _VERTEX_DATA_URL and
     _EDGE_DATA_URL and storing them at _VERTEX_DATA_PATH and _EDGE_DATA_PATH if need be. VERTEX_FILENAME and
     EDGE_FILENAME are the filenames to save the processed vertex and edge data to."""
@@ -81,76 +106,35 @@ class GowallaDataCreator:
     _VERTEX_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_totalCheckins.txt"
     _EDGE_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_edges.txt"
 
-    def __init__(self, rng: np.random.Generator, folder: Path):
-        self.vertex_path = folder / SAVED_VERTEX_FILENAME
-        self.weight_path = folder / SAVED_WEIGHT_FILENAME
-        self.edge_path = folder / SAVED_EDGE_FILENAME
-        self.folder = folder
-        self.rng = rng
-
+    def __init__(self, rng: np.random.Generator, base_folder: Path):
         if not self._snap_data_present():
             self._obtain_snap_data()
-        self.vertices, self.tie_data = self._create_vertices()
-        self.weights = self._create_weights()
-        self.edge_list = self._create_edges(self.vertices)
+        self.ties: List[TieDatum] = []
+        super().__init__(rng=rng, base_folder=base_folder)
 
-    def save_files(self):
-        """Saves the recreated Gowalla data in pickled form to self.vertex_path and self.edge_path."""
-        self.folder.mkdir(parents=True, exist_ok=True)
-
-        print("Saving vertex set...")
-        with open(self.vertex_path, "wb") as file:
-            dill.dump(self.vertices, file)
-
-        print("Saving weights...")
-        with open(self.weight_path, "wb") as file:
-            dill.dump(self.weights, file)
-
-        print("Saving edge list...")
-        with open(self.edge_path, "wb") as file:
-            dill.dump(self.edge_list, file)
+    @property
+    def name(self) -> str:
+        return "gowalla_data"
 
     @classmethod
     def _obtain_snap_data(cls):
         """Downloads any of the Gowalla data not already present locally."""
         if not cls._VERTEX_DATA_PATH.exists():
-            cls._obtain_data_file(url=cls._VERTEX_DATA_URL, dest_path=cls._VERTEX_DATA_PATH)
+            obtain_data_file(url=cls._VERTEX_DATA_URL, dest_path=cls._VERTEX_DATA_PATH)
         if not cls._EDGE_DATA_PATH.exists():
-            cls._obtain_data_file(url=cls._EDGE_DATA_URL, dest_path=cls._EDGE_DATA_PATH)
-
-    @staticmethod
-    def _obtain_data_file(url: str, dest_path: Path):
-        """Downloads the given .gz (not .tar.gz) file from the given URL, unzips it in the given folder to the given
-        name, and deletes the original .gz file."""
-        dest_folder = dest_path.parent
-        dest_folder.mkdir(parents=True, exist_ok=True)
-
-        local_file = dest_folder / Path(url).name
-        print(f"Downloading from {url} to {local_file}...")
-
-        with requests.get(url, stream=True) as response:
-            response.raise_for_status()
-            with local_file.open("wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-        print("Download completed.")
-
-        print("Extracting archive...")
-        with gzip.open(local_file, "rb") as gz, open(dest_path, "wb") as out:
-            shutil.copyfileobj(gz, out)  # type: ignore
-        print("Extraction completed.")
-
-        print(f"Deleting temporary file {local_file}...")
-        local_file.unlink()
-        print("Temporary file deleted.")
+            obtain_data_file(url=cls._EDGE_DATA_URL, dest_path=cls._EDGE_DATA_PATH)
 
     @classmethod
     def _snap_data_present(cls):
         """Returns true if all the raw Gowalla data has already been downloaded from the SNAP site."""
         return cls._VERTEX_DATA_PATH.exists() and cls._EDGE_DATA_PATH.exists()
 
-    def _create_vertices(self) -> Tuple[VertexSet, List[TieDatum]]:
+    def create_data(self) -> None:
+        self.vertices = self._create_vertices()
+        self.weights = self._create_weights(self.vertices)
+        self.edge_list = self._create_edges(self.vertices)
+
+    def _create_vertices(self) -> VertexSet:
         """Reads in the raw vertex data for the Gowalla dataset (downloading it first if needed), adds weights based
         on vertex degrees, and returns the resulting vertex set with mu and zeta initialised to 0. Nodes without
         position information from check-ins are omitted from the vertex set."""
@@ -168,21 +152,24 @@ class GowallaDataCreator:
 
         print("Mapping user IDs to positions...")
         user_id_to_position = {}
-        ties = []
         for id_, check_in_list in user_id_dict.items():
             position, tie_datum = self._get_user_position(check_in_list)
             user_id_to_position[id_] = position
             if tie_datum is not None:
-                ties.append(tie_datum)
+                self.ties.append(tie_datum)
 
         print("Generating vertex set...")
         vertex_set = VertexSet(dimension=2, metric=EarthDistance())
         vertex_set.set_points_from_names(user_id_to_position)
-        return vertex_set, ties
 
-    def _create_weights(self) -> List[float]:
+        return vertex_set
+
+    def _create_weights(self, vertices: VertexSet) -> List[float]:
+        if vertices is None:
+            raise RuntimeError(f"Vertex set has not been created yet.")
+
         print("Reading vertex degrees for weight initialisation...")
-        names = set(self.vertices.names)
+        names = set(vertices.names)
         degree_dict = {x: 0 for x in names}
         with open(self._EDGE_DATA_PATH, "rb") as file:
             # Each edge appears twice, once in each direction, so it's correct to only increment the first endpoint.
@@ -194,7 +181,7 @@ class GowallaDataCreator:
                 degree_dict[user_id_0] += 1
 
         print("Generating weights...")
-        weights = [float(degree_dict[self.vertices.id_to_name(i)]) for i in range(self.vertices.size)]
+        weights = [float(degree_dict[vertices.id_to_name(i)]) for i in range(vertices.size)]
         return weights
 
     def _get_user_position(self, check_in_list: Sequence[CheckIn]) -> Tuple[Tuple[float, float], Optional[TieDatum]]:
@@ -240,88 +227,62 @@ class GowallaDataCreator:
         id_strings = line.decode(encoding="utf-8").replace("\n", "").split("\t")
         return int(id_strings[0]), int(id_strings[1])
 
-    @classmethod
-    def _create_edges(cls, vertices: VertexSet) -> List[List[int]]:
+    def _create_edges(self, vertices: VertexSet) -> List[Tuple[int, int]]:
         """Reads the edge set for the Gowalla dataset, downloading it first if needed, and returns the resulting list
         of vertex ID pairs. Takes the vertex set as an argument since vertices without positional data should not be
         included, and calculating this is slow enough that we don't want to do it twice."""
-        if not cls._snap_data_present():
-            cls._obtain_snap_data()
+        if vertices is None:
+            raise RuntimeError(f"Vertex set has not been created yet.")
+
+        if not self._snap_data_present():
+            self._obtain_snap_data()
 
         print("Reading edge list...")
         edge_list = []
         vertex_names = set(vertices.names)  # Compute the set only once to save time.
-        with open(cls._EDGE_DATA_PATH, "rb") as file:
+        with open(self._EDGE_DATA_PATH, "rb") as file:
             for i, line in enumerate(file):
                 if i % 100000 == 0 and 0 < i < 1900000:
                     print(f"Edge {i / 1000000}M/1.9M complete.")
-                id_0, id_1 = cls._parse_edge_line(line)
+                id_0, id_1 = self._parse_edge_line(line)
                 if id_0 not in vertex_names or id_1 not in vertex_names:
                     continue
                 # Each edge appears twice, once in each direction.
                 if id_0 < id_1:
-                    edge_list.append([vertices.name_to_id(id_0), vertices.name_to_id(id_1)])
+                    edge_list.append((vertices.name_to_id(id_0), vertices.name_to_id(id_1)))
 
         return edge_list
-
-
-class GowallaVertexGen(VertexSetGen):
-    """Reads the Gowalla graph's vertices from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
-        self._function = functools.partial(self._get_vertices, folder=folder)
-
-    @staticmethod
-    def _get_vertices(rng: np.random.Generator, folder: Path):
-        if not gowalla_data_exists(folder):
-            create_gowalla_data(rng, folder)
-        with open(folder / SAVED_VERTEX_FILENAME, "rb") as file:
-            return dill.load(file)
-
-
-class GowallaWeightGen(WeightGen):
-    """Reads the Gowalla graph's weights from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
-        self._function = functools.partial(self._get_weights, folder=folder)
-
-    @staticmethod
-    def _get_weights(_: VertexSet, rng: np.random.Generator, folder: Path):
-        if not gowalla_data_exists(folder):
-            create_gowalla_data(rng, folder)
-        with open(folder / SAVED_WEIGHT_FILENAME, "rb") as file:
-            return dill.load(file)
-
-
-class GowallaEdgeGen(EdgeGen):
-    """Reads the Gowalla graph's edges from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
-        self._function = functools.partial(self._get_edges, folder=folder)
-
-    @staticmethod
-    def _get_edges(_: WeightedVertexSet, rng: np.random.Generator, folder: Path):
-        if not gowalla_data_exists(folder):
-            create_gowalla_data(rng, folder)
-        with open(folder / SAVED_EDGE_FILENAME, "rb") as file:
-            return dill.load(file)
-
-
-class GowallaSIEpidemic(SIEpidemic):
-    """An SIEpidemic on the Gowalla graph. Creates the Gowalla data from scratch in the given folder using a
-    GowallaDataCreator if needed, otherwise just unpickles it."""
-    def __init__(self, cost_gen: EdgeCostGen, mu: float, zeta: float, name: str, rng: np.random.Generator,
-                 gowalla_folder: Path = DEFAULT_SAVE_FOLDER):
-        vertex_gen = GowallaVertexGen(gowalla_folder)
-        weight_gen = GowallaWeightGen(gowalla_folder)
-        edge_gen = GowallaEdgeGen(gowalla_folder)
-
-        vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
-        super().__init__(vertex_set=vertex_set, cost_gen=cost_gen, edge_gen=edge_gen, mu=mu, zeta=zeta,
-                         rng=rng, name=name)
 
 
 class GowallaInitialVertexFn(InitialVertexFunction):
     def __init__(self):
         self._function = lambda _: 164
         self.description = "User at (49.50, 11.44) near Nuremburg."
+
+
+class SyntheticGowallaGen(PresetGraph):
+    SIZE = 500
+
+    @property
+    def DEFAULT_SEED(self) -> int:
+        return 276482048599935051615627698249100747258
+
+    @property
+    def name(self) -> str:
+        return "syn-gowalla"
+
+    @property
+    def description(self) -> str:
+        return f"""Synthetic GIRG with Gowalla parameters: tau = {GOWALLA_TAU}, alpha = {GOWALLA_ALPHA}, 
+            n = {self.SIZE*self.SIZE}."""
+
+    def _generate_data(self) -> Tuple[VertexSet, Sequence[float], Sequence[Tuple[int, int]]]:
+        vertex_gen = PoissonPointProcess(dimension=2, size=self.SIZE)
+        weight_gen = PowerLawWeightGen(tau=GOWALLA_TAU, ell=IdentityWeightScaler())
+        vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=self.rng)
+        edge_gen = GirgGen(alpha=GOWALLA_ALPHA, scale_factor=1/self.SIZE)
+        edges = edge_gen(vertex_set, self.rng)
+        return vertex_set.vertices, vertex_set.weights, edges
 
 
 def plot_tie_data(data: Sequence[TieDatum]):

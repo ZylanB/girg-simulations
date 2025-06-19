@@ -5,18 +5,30 @@ import unittest
 import graph_tool.topology  # type: ignore
 import numpy as np
 
-from Gowalla import CheckIn, GowallaDataCreator, GowallaSIEpidemic
-from SIEpidemic import GenericEdgeCostGen
+from Gowalla import CheckIn, GowallaGen, GowallaGraph
+from SIEpidemic import GenericEdgeCostGen, SIEpidemic
 from TestDistribution import dkw_p_value
+from PresetGraph import PresetGen
 
 
 TEST_SAVE_FOLDER = Path.cwd() / "test_files"
 
 
-def clear_test_files() -> None:
-    for child in TEST_SAVE_FOLDER.iterdir():
-        if child.is_file() and child.suffix == ".pickle":
+def clear_single_test_files() -> None:
+    if not TEST_SAVE_FOLDER.exists():
+        return
+    for child in TEST_SAVE_FOLDER.rglob("*.pickle"):
+        files_to_preserve = [PresetGen.SAVED_VERTEX_FILENAME, PresetGen.SAVED_WEIGHT_FILENAME,
+                             PresetGen.SAVED_EDGE_FILENAME]
+        if child.name not in files_to_preserve:
             child.unlink()
+
+
+def clear_graph_files() -> None:
+    if not TEST_SAVE_FOLDER.exists():
+        return
+    for child in TEST_SAVE_FOLDER.rglob("*.pickle"):
+        child.unlink()
 
 
 class ParsingTests(unittest.TestCase):
@@ -33,7 +45,7 @@ class ParsingTests(unittest.TestCase):
 
     def test_edges(self):
         test_line = "3542\t4466\n".encode("utf-8")
-        id_0, id_1 = GowallaDataCreator._parse_edge_line(test_line)
+        id_0, id_1 = GowallaGen._parse_edge_line(test_line)
         self.assertEqual(id_0, 3542)
         self.assertEqual(id_1, 4466)
 
@@ -43,26 +55,39 @@ class DownloadTests(unittest.TestCase):
     def test_download(self):
         """Deletes the data, then attempts to re-download it. Asserts the resulting files exist and have non-zero
         size."""
-        GowallaDataCreator._VERTEX_DATA_PATH.unlink(missing_ok=True)
-        GowallaDataCreator._EDGE_DATA_PATH.unlink(missing_ok=True)
+        GowallaGen._VERTEX_DATA_PATH.unlink(missing_ok=True)
+        GowallaGen._EDGE_DATA_PATH.unlink(missing_ok=True)
 
-        self.assertFalse(GowallaDataCreator._VERTEX_DATA_PATH.exists())
-        self.assertFalse(GowallaDataCreator._EDGE_DATA_PATH.exists())
+        self.assertFalse(GowallaGen._VERTEX_DATA_PATH.exists())
+        self.assertFalse(GowallaGen._EDGE_DATA_PATH.exists())
 
-        GowallaDataCreator._obtain_snap_data()
+        GowallaGen._obtain_snap_data()
 
-        self.assertTrue(GowallaDataCreator._VERTEX_DATA_PATH.exists())
-        self.assertGreater(GowallaDataCreator._VERTEX_DATA_PATH.stat().st_size, 0)
-        self.assertTrue(GowallaDataCreator._EDGE_DATA_PATH.exists())
-        self.assertGreater(GowallaDataCreator._EDGE_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaGen._VERTEX_DATA_PATH.exists())
+        self.assertGreater(GowallaGen._VERTEX_DATA_PATH.stat().st_size, 0)
+        self.assertTrue(GowallaGen._EDGE_DATA_PATH.exists())
+        self.assertGreater(GowallaGen._EDGE_DATA_PATH.stat().st_size, 0)
 
 
 class GenerationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        clear_graph_files()
         cls.entropy = 89654657203871215244168134687054070552
-        rng = np.random.default_rng(seed=cls.entropy)
-        cls.instance = GowallaDataCreator(rng=rng, folder=TEST_SAVE_FOLDER)
+        cls.rng = np.random.default_rng(cls.entropy)
+        cls.instance = GowallaGen(rng=cls.rng, base_folder=TEST_SAVE_FOLDER)
+        cls.instance.create_data()
+        cls.instance.save_data()
+
+    @classmethod
+    def tearDownClass(cls):
+        clear_graph_files()
+
+    def setUp(self):
+        clear_single_test_files()
+
+    def tearDown(self):
+        clear_single_test_files()
 
     def test_position_calculation_basic(self):
         check_ins = [
@@ -136,12 +161,11 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(6.137472530978548e-09, p_value)
 
     def test_save_load(self):
-        clear_test_files()
-        self.instance.save_files()
-        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should load the Gowalla dataset we just saved. If it doesn't, the result will differ due to different seeds.
-        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
-                                          rng=np.random.default_rng(), gowalla_folder=TEST_SAVE_FOLDER)
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
+                                                      rng=np.random.default_rng(seed=self.entropy))
         self.check_against_instance(test_epidemic)
         test_epidemic.save_config(TEST_SAVE_FOLDER)
 
@@ -152,19 +176,20 @@ class GenerationTests(unittest.TestCase):
         self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.vertex_config_filename).exists())
         self.assertTrue((TEST_SAVE_FOLDER / test_epidemic.vertex_config_filename).stat().st_size < 2000)
 
-        test_epidemic = GowallaSIEpidemic.load_from_config(folder=TEST_SAVE_FOLDER, rng=np.random.default_rng(),
-                                                           name="test")
+        test_epidemic = SIEpidemic.load_from_config(folder=TEST_SAVE_FOLDER, rng=np.random.default_rng(), name="test")
         self.check_against_instance(test_epidemic)
-        clear_test_files()
 
     def test_recreate_load(self):
-        clear_test_files()
-        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should recreate the Gowalla dataset with the same RNG seed as in setup, then save it, then load it.
-        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
-                                          rng=np.random.default_rng(seed=self.entropy), gowalla_folder=TEST_SAVE_FOLDER)
+        clear_graph_files()
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        new_instance = GowallaGen(rng=np.random.default_rng(seed=self.entropy), base_folder=TEST_SAVE_FOLDER)
+        new_instance.create_data()
+        new_instance.save_data()
+        test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
+                                                      rng=np.random.default_rng(seed=self.entropy))
         self.check_against_instance(test_epidemic)
-        clear_test_files()
 
     def check_against_instance(self, test_epidemic):
         original_vertices = self.instance.vertices
@@ -191,9 +216,10 @@ class GenerationTests(unittest.TestCase):
 class GraphTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        edge_cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
-        test_epidemic = GowallaSIEpidemic(cost_gen=edge_cost_gen, mu=1., zeta=2., name="test",
-                                          rng=np.random.default_rng())
+        cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
+                                                      rng=np.random.default_rng())
         cls.vertex_set = test_epidemic.vertex_set
         cls.graph = test_epidemic.graph
 
