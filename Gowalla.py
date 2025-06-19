@@ -14,6 +14,7 @@ import numpy as np
 import requests
 
 from SIEpidemic import SIEpidemic, EdgeGen, EdgeCostGen
+from SIExperiment import InitialVertexFunction
 from VertexSet import EarthDistance, VertexSet, VertexSetGen
 from WeightedVertexSet import WeightedVertexSet, WeightGen
 
@@ -24,8 +25,13 @@ SAVED_WEIGHT_FILENAME = "weights.pickle"
 SAVED_EDGE_FILENAME = "edges.pickle"
 
 
+# Parameter values for synthetic GIRGs to mimic Gowalla.
+GOWALLA_ALPHA = 1.17
+GOWALLA_TAU = 2.8
+
+
 def gowalla_data_exists(folder: Path) -> bool:
-    return (folder / SAVED_EDGE_FILENAME).exists() and (folder / SAVED_EDGE_FILENAME).exists()
+    return (folder / SAVED_VERTEX_FILENAME).exists() and (folder / SAVED_EDGE_FILENAME).exists()
 
 
 def create_gowalla_data(rng: np.random.Generator, folder: Path = DEFAULT_SAVE_FOLDER) -> None:
@@ -261,7 +267,7 @@ class GowallaDataCreator:
 
 class GowallaVertexGen(VertexSetGen):
     """Reads the Gowalla graph's vertices from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
         self._function = functools.partial(self._get_vertices, folder=folder)
 
     @staticmethod
@@ -274,7 +280,7 @@ class GowallaVertexGen(VertexSetGen):
 
 class GowallaWeightGen(WeightGen):
     """Reads the Gowalla graph's weights from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
         self._function = functools.partial(self._get_weights, folder=folder)
 
     @staticmethod
@@ -287,7 +293,7 @@ class GowallaWeightGen(WeightGen):
 
 class GowallaEdgeGen(EdgeGen):
     """Reads the Gowalla graph's edges from file, first creating them with GowallaDataCreator if necessary."""
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path = DEFAULT_SAVE_FOLDER):
         self._function = functools.partial(self._get_edges, folder=folder)
 
     @staticmethod
@@ -310,6 +316,12 @@ class GowallaSIEpidemic(SIEpidemic):
         vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
         super().__init__(vertex_set=vertex_set, cost_gen=cost_gen, edge_gen=edge_gen, mu=mu, zeta=zeta,
                          rng=rng, name=name)
+
+
+class GowallaInitialVertexFn(InitialVertexFunction):
+    def __init__(self):
+        self._function = lambda _: 164
+        self.description = "User at (49.50, 11.44) near Nuremburg."
 
 
 def plot_tie_data(data: Sequence[TieDatum]):
