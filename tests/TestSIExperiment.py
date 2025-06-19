@@ -80,7 +80,7 @@ class FileIOTests(unittest.TestCase):
         self.varying_cost_gen = GenericEdgeCostGen(_test_cost_gen, "Varying test cost generator")
         self.varying_vertex_gen = GenericVertexSetGen(_test_vertex_gen, "Varying test vertex generator")
 
-        self.initial_vertex_fn = GenericInitialVertexFunction(lambda _: 0, "Zero vertex")
+        self.initial_vertex_fn = GenericInitialVertexFunction(lambda _, __: 0, "Zero vertex")
         self.edge_count = GenericResultFunction(lambda epi, _: epi.graph.num_edges(), "Edge count")
         self.sum_weights = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
         self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.size, description="Vertex count")
@@ -266,7 +266,7 @@ class FileIOTests(unittest.TestCase):
             saved_settings = f.read()
         expected_cfg = textwrap.dedent(f"""\
             name==test
-            log_path==/mnt/e/GitHub/girg-simulations/test_files
+            log_path==/mnt/e/GitHub/girg-simulations/tests/test_files
             full_log==False
             run_count==7
             resample_edges==True
@@ -305,7 +305,7 @@ class SeedSavingTests(unittest.TestCase):
         edge_gen = GirgGen(alpha=1.5, scale_factor=1 / 10)
         cost_gen = FPPCostGen(lambda_=1)
         result_fn = GenericResultFunction(lambda _, __: None, "Throw away results")
-        initial_vertex_fn = GenericInitialVertexFunction(lambda _: 0, "Zero vertex")
+        initial_vertex_fn = GenericInitialVertexFunction(lambda _, __: 0, "Zero vertex")
 
         self.original = SIExperiment(vertex_gen=vertex_gen, weight_gen=weight_gen, edge_gen=edge_gen, cost_gen=cost_gen,
                                      run_count=4, resample_edges=True, resample_costs=True, resample_weights=True,
@@ -365,7 +365,9 @@ class SeedSavingTests(unittest.TestCase):
 
 
 def clear_test_files():
-    # Clear out existing files from previous tests to make sure new ones are created.
+    """Clear out existing files from previous tests to make sure new ones are created."""
+    if not TEST_DIR.exists():
+        return
     for child in TEST_DIR.iterdir():
         if child.is_file() and child.suffix in [".gt", ".cfg", ".pickle"]:
             child.unlink()

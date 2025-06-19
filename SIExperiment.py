@@ -1,5 +1,5 @@
-from typing import Any, List, Optional
 from pathlib import Path
+from typing import Any, List, Optional
 
 import numpy as np
 import dill  # type: ignore
@@ -10,8 +10,8 @@ from VertexSet import VertexSetGen
 from WeightedVertexSet import WeightedVertexSet, WeightGen
 
 
-class InitialVertexFunction(LoggableFunction[[np.random.Generator], int]):
-    """Function to choose the initial vertex of each run of an experiment. Includes a name for logging."""
+class InitialVertexFunction(LoggableFunction[[WeightedVertexSet, np.random.Generator], int]):
+    """Function to choose the ID of the initial vertex of each run of an experiment. Includes a name for logging."""
     @property
     def function_role(self):
         return "Initial vertex selector"
@@ -117,7 +117,9 @@ class SIExperiment:
                     self.current_run.sample_edge_costs(self.rng)
                 elif self.resample_costs:
                     self.current_run.sample_edge_costs(self.rng)
-        self.current_run.run_infection(initial_vertex_id=self.initial_vertex_fn(self.rng))
+
+        initial_vertex_id = self.initial_vertex_fn(self.current_run.vertex_set, self.rng)
+        self.current_run.run_infection(initial_vertex_id=initial_vertex_id)
         self.results.append(self.result_fn(self.current_run, self.rng))
         if self.full_log:
             self._log_run()
