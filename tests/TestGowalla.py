@@ -5,7 +5,7 @@ import unittest
 import graph_tool.topology  # type: ignore
 import numpy as np
 
-from Gowalla import CheckIn, GowallaGen, GowallaGraph
+from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph
 from SIEpidemic import GenericEdgeCostGen, SIEpidemic
 from TestDistribution import dkw_p_value
 from PresetGraph import PresetGen
@@ -28,6 +28,8 @@ def clear_graph_files() -> None:
     if not TEST_SAVE_FOLDER.exists():
         return
     for child in TEST_SAVE_FOLDER.rglob("*.pickle"):
+        child.unlink()
+    for child in TEST_SAVE_FOLDER.rglob("*.csv"):
         child.unlink()
 
 
@@ -272,6 +274,24 @@ class GraphTests(unittest.TestCase):
     def test_specific_exclusion(self):
         # This user has no location information available and shouldn't be included in the graph.
         self.assertNotIn(196579, self.vertex_set.names)
+
+
+class SyntheticGowallaTests(unittest.TestCase):
+    def setUp(self):
+        clear_graph_files()
+
+    def tearDown(self):
+        clear_graph_files()
+
+    def test_parameters(self):
+        """Make sure we're generating the right graph."""
+        syn_gowalla = SyntheticGowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
+        epidemic = syn_gowalla.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
+                                               rng=np.random.default_rng())
+
+        self.assertEqual(epidemic.vertex_set.size, 249659)
+        self.assertEqual(len(list(epidemic.graph.edges())), 10885797)
 
 
 if __name__ == '__main__':

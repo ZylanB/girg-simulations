@@ -8,6 +8,7 @@ import shutil
 from typing import List, Optional, Sequence, Tuple, Type
 
 import dill  # type: ignore
+import graph_tool.all as gt  # type: ignore
 import matplotlib.pyplot as plt
 import numpy as np
 import requests
@@ -15,12 +16,13 @@ import requests
 from PresetGraph import PresetGraph, PresetGen
 from SIEpidemic import GirgGen
 from SIExperiment import InitialVertexFunction
-from VertexSet import EarthDistance, VertexSet, PoissonPointProcess
+from VertexSet import EarthDistance, VertexSet, PoissonPointProcess, TorusDistance
 from WeightedVertexSet import PowerLawWeightGen, IdentityWeightScaler, WeightedVertexSet
 
 # Parameter values for synthetic GIRGs to mimic Gowalla.
-GOWALLA_ALPHA = 1.17
-GOWALLA_TAU = 2.8
+SYN_GOWALLA_ALPHA = 1.17
+SYN_GOWALLA_TAU = 2.8
+SYN_GOWALLA_SIZE = 500
 
 
 def obtain_data_file(url: str, dest_path: Path):
@@ -260,29 +262,56 @@ class GowallaInitialVertexFn(InitialVertexFunction):
         self.description = "User at (49.50, 11.44) near Nuremburg."
 
 
-class SyntheticGowallaGen(PresetGraph):
-    SIZE = 500
-
+class SyntheticGowallaGraph(PresetGraph):
     @property
     def DEFAULT_SEED(self) -> int:
         return 276482048599935051615627698249100747258
 
     @property
+    def description(self) -> str:
+        return f"""Synthetic GIRG with Gowalla parameters: tau = {SYN_GOWALLA_TAU}, alpha = {SYN_GOWALLA_ALPHA}, 
+            generated on the torus [0,{SYN_GOWALLA_SIZE})^2. Restricted to the giant component."""
+
+    @property
+    def graph_generator_class(self) -> Type[PresetGen]:
+        return SyntheticGowallaGen
+
+
+class SyntheticGowallaGen(PresetGen):
+    @property
     def name(self) -> str:
         return "syn-gowalla"
 
-    @property
-    def description(self) -> str:
-        return f"""Synthetic GIRG with Gowalla parameters: tau = {GOWALLA_TAU}, alpha = {GOWALLA_ALPHA}, 
-            n = {self.SIZE*self.SIZE}."""
-
-    def _generate_data(self) -> Tuple[VertexSet, Sequence[float], Sequence[Tuple[int, int]]]:
-        vertex_gen = PoissonPointProcess(dimension=2, size=self.SIZE)
-        weight_gen = PowerLawWeightGen(tau=GOWALLA_TAU, ell=IdentityWeightScaler())
+    def create_data(self) -> None:
+        print("Generating GIRG...")
+        vertex_gen = PoissonPointProcess(dimension=2, size=SYN_GOWALLA_SIZE)
+        weight_gen = PowerLawWeightGen(tau=SYN_GOWALLA_TAU, ell=IdentityWeightScaler())
         vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=self.rng)
-        edge_gen = GirgGen(alpha=GOWALLA_ALPHA, scale_factor=1/self.SIZE)
+        edge_gen = GirgGen(alpha=SYN_GOWALLA_ALPHA, scale_factor=1 / SYN_GOWALLA_SIZE)
         edges = edge_gen(vertex_set, self.rng)
-        return vertex_set.vertices, vertex_set.weights, edges
+
+        print("Loading GIRG...")
+        graph = gt.Graph(directed=False)
+        graph.add_vertex(n=vertex_set.size)
+        graph.add_edge_list(edges)
+        print("Finding giant component...")
+        giant = gt.extract_largest_component(graph)
+
+        print("Renumbering vertices of giant component...")
+        induced_vertex_ids = [int(v) for v in giant.vertices()]
+        name_to_pos_dict = {i: vertex_set.id_to_position(i) for i in induced_vertex_ids}
+        self.vertices = VertexSet(dimension=2, metric=TorusDistance(d=2, size=SYN_GOWALLA_SIZE))
+        self.vertices.set_points_from_names(name_to_pos_dict)
+
+        self.weights = [0.] * len(induced_vertex_ids)
+        for i in induced_vertex_ids:
+            self.weights[self.vertices.name_to_id(i)] = vertex_set.weights[i]
+        if 0. in self.weights:
+            raise RuntimeError(f"Something's badly wrong.")
+
+        old_to_new = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
+        giant_edge_list = list(giant.edges())
+        self.edge_list = [(old_to_new[i], old_to_new[j]) for (i, j) in giant_edge_list]
 
 
 def plot_tie_data(data: Sequence[TieDatum]):

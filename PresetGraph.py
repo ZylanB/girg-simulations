@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional, Sequence, Tuple, Type, TypedDict
 
 import dill  # type: ignore
+import csv
 import numpy as np
 
 from SIEpidemic import EdgeCostGen, EdgeGen, GenericEdgeGen, SIEpidemic
@@ -59,7 +60,9 @@ class PresetGraph:
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
         if not generator.data_exists:
             generator.create_data()
+            generator.save_data()
             return generator.vertices
+        print("Loading vertices...")
         with open(generator.vertex_path, "rb") as file:
             return dill.load(file)
 
@@ -76,7 +79,9 @@ class PresetGraph:
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
         if not generator.data_exists:
             generator.create_data()
+            generator.save_data()
             return generator.weights
+        print("Loading weights...")
         with open(generator.weight_path, "rb") as file:
             return dill.load(file)
 
@@ -93,9 +98,15 @@ class PresetGraph:
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
         if not generator.data_exists:
             generator.create_data()
+            generator.save_data()
             return generator.edge_list
-        with open(generator.edge_path, "rb") as file:
-            return dill.load(file)
+        print("Loading edges...")
+        with open(generator.edge_path, "r") as file:
+            edge_list = []
+            reader = csv.reader(file, delimiter=",")
+            for row in reader:
+                edge_list.append((int(row[0]), int(row[1])))
+        return edge_list
 
     @property
     def edge_gen(self):
@@ -123,8 +134,8 @@ class PresetGen:
     PresetGen stores things like vertices and edges as members, which will be picked up as part of the closures of
     PresetGraph.vertex_gen etc. and then saved in full as part of logging (taking excessive extra space and time)."""
     SAVED_VERTEX_FILENAME = "vertices.pickle"
-    SAVED_WEIGHT_FILENAME = "weights.pickle"
-    SAVED_EDGE_FILENAME = "edges.pickle"
+    SAVED_WEIGHT_FILENAME = "weights.json"
+    SAVED_EDGE_FILENAME = "edges.csv"
 
     def __init__(self, rng: np.random.Generator, base_folder: Path):
         self.rng = rng
@@ -171,12 +182,17 @@ class PresetGen:
 
         print("Saving vertex set...")
         with open(self.vertex_path, "wb") as file:
-            dill.dump(self.vertices, file)
+            dill.dump(self.vertices, file)  # type: ignore
 
         print("Saving weight list...")
         with open(self.weight_path, "wb") as file:
-            dill.dump(self.weights, file)
+            dill.dump(self.weights, file)  # type: ignore
 
+        # Using csv rather than dill because dill is slooooowwww for large objects and the edge sets can be 180+MB.
         print("Saving edge list...")
-        with open(self.edge_path, "wb") as file:
-            dill.dump(self.edge_list, file)
+        with open(self.edge_path, "w") as file:
+            writer = csv.writer(file, delimiter=',')
+            for entry in self.edge_list:
+                writer.writerow(entry)
+
+        print("All saved.")
