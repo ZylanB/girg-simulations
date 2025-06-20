@@ -259,6 +259,7 @@ class FileIOTests(unittest.TestCase):
         self.assertEqual(loaded_experiment.results, experiment.results)
 
     def test_config_format(self):
+        self.maxDiff = None
         self.experiment_args['resample_edges'] = True
         experiment = SIExperiment(**self.experiment_args, result_fn=self.edge_count)
         experiment.save_config()
@@ -266,7 +267,7 @@ class FileIOTests(unittest.TestCase):
             saved_settings = f.read()
         expected_cfg = textwrap.dedent(f"""\
             name==test
-            log_path==/mnt/e/GitHub/girg-simulations/tests/test_files
+            log_path=={Path.cwd()}/test_files
             full_log==False
             run_count==7
             resample_edges==True
