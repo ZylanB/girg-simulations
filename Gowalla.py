@@ -16,8 +16,7 @@ import requests
 import config
 from PresetGraph import extract_giant_data, GraphData, PresetGraph, PresetGen
 from SIEpidemic import GirgGen
-from SIExperiment import InitialVertexFunction
-from VertexSet import EarthDistance, VertexSet, PoissonPointProcess, TorusDistance
+from VertexSet import EarthDistance, VertexSet, PoissonPointProcess
 from WeightedVertexSet import PowerLawWeightGen, IdentityWeightScaler, WeightedVertexSet
 
 # Parameter values for synthetic GIRGs to mimic Gowalla.
@@ -255,12 +254,6 @@ class GowallaGen(PresetGen):
                     edge_list.append((vertices.name_to_id(id_0), vertices.name_to_id(id_1)))
 
         return edge_list
-
-
-class GowallaInitialVertexFn(InitialVertexFunction):
-    def __init__(self):
-        self._function = lambda _, __: 164
-        self.description = "User at (49.50, 11.44) near Nuremburg."
 
 
 class SyntheticGowallaGraph(PresetGraph):
