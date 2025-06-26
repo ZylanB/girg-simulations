@@ -50,19 +50,17 @@ def extract_giant_data(data: GraphData) -> GraphData:
 
     print("Renumbering vertices of giant component...")
     induced_vertex_ids = [int(v) for v in giant.vertices()]
-    name_to_pos_dict = {i: data.vertex_set.id_to_position(i) for i in induced_vertex_ids}
+    name_to_pos_dict = {data.vertex_set.id_to_name(i): data.vertex_set.id_to_position(i) for i in induced_vertex_ids}
     giant_vertex_set = VertexSet(dimension=2, metric=data.vertex_set.metric)
     giant_vertex_set.set_points_from_names(name_to_pos_dict)
 
-    giant_weights = [0.] * len(induced_vertex_ids)
+    old_to_new_ids = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
+    giant_weights = [0.] * giant_vertex_set.size
     for i in induced_vertex_ids:
-        giant_weights[giant_vertex_set.name_to_id(i)] = data.weights[i]
-    if 0. in giant_weights:
-        raise RuntimeError(f"Something's badly wrong.")
+        giant_weights[old_to_new_ids[i]] = data.weights[i]
 
-    old_to_new = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
     giant_edge_list = list(giant.edges())
-    giant_edge_list = [(old_to_new[i], old_to_new[j]) for (i, j) in giant_edge_list]
+    giant_edge_list = [(old_to_new_ids[i], old_to_new_ids[j]) for (i, j) in giant_edge_list]
 
     return GraphData(vertex_set=giant_vertex_set, weights=giant_weights, edge_list=giant_edge_list)
 
