@@ -1,11 +1,11 @@
 from collections import defaultdict
 import math
-from pathlib import Path
 import unittest
 
 import numpy as np
 from scipy.stats import binom  # type: ignore
 
+import config
 from SIEpidemic import ConstantCostGen, FixedGraphGen, FPPCostGen, GirgGen, SIEpidemic
 from TestDistribution import dkw_p_value
 from WeightedVertexSet import FixedWeightGen, WeightedVertexSet, PowerLawWeightGen, IdentityWeightScaler
@@ -315,7 +315,7 @@ class GIRGTests(unittest.TestCase):
 
 class FileIOTests(unittest.TestCase):
     def setUp(self):
-        self.log_path = Path.cwd() / "test_files"
+        self.log_path = config.TEST_FOLDER
         self.log_path.mkdir(parents=True, exist_ok=True)
         self.clearTestFiles()
 

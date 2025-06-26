@@ -1,7 +1,7 @@
-from pathlib import Path
-import unittest
 import textwrap
+import unittest
 
+import config
 from SIEpidemic import GenericEdgeCostGen, GenericEdgeGen, FPPCostGen, GirgGen
 from SIExperiment import SIExperiment, GenericInitialVertexFunction, GenericResultFunction
 from VertexSet import GenericVertexSetGen, FixedVertexSet, EuclideanDistance, PoissonPointProcess
@@ -13,7 +13,7 @@ pickled as part of SIEpidemic.save_config, dill pickles their closure along with
 and raising an exception. This only matters when writing unit tests."""
 
 
-TEST_DIR = Path.cwd() / "test_files"
+TEST_DIR = config.TEST_FOLDER
 
 
 def _test_weight_gen(vertices, _):
@@ -267,7 +267,7 @@ class FileIOTests(unittest.TestCase):
             saved_settings = f.read()
         expected_cfg = textwrap.dedent(f"""\
             name==test
-            log_path=={Path.cwd()}/test_files
+            log_path=={config.TEST_FOLDER}
             full_log==False
             run_count==7
             resample_edges==True

@@ -5,7 +5,8 @@ import unittest
 import graph_tool.topology  # type: ignore
 import numpy as np
 
-from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph
+import config
+from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph, GowallaGiantGraph
 from SIEpidemic import GenericEdgeCostGen, SIEpidemic
 from TestDistribution import dkw_p_value
 from PresetGraph import PresetGen

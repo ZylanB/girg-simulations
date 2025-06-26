@@ -14,6 +14,7 @@ import numpy as np
 import requests
 
 from PresetGraph import PresetGraph, PresetGen
+import config
 from SIEpidemic import GirgGen
 from SIExperiment import InitialVertexFunction
 from VertexSet import EarthDistance, VertexSet, PoissonPointProcess, TorusDistance
@@ -105,8 +106,8 @@ class GowallaGen(PresetGen):
     EDGE_FILENAME are the filenames to save the processed vertex and edge data to."""
     _VERTEX_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_totalCheckins.txt.gz"
     _EDGE_DATA_URL = f"https://snap.stanford.edu/data/loc-gowalla_edges.txt.gz"
-    _VERTEX_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_totalCheckins.txt"
-    _EDGE_DATA_PATH = Path.cwd() / "gowalla_data" / "Gowalla_edges.txt"
+    _VERTEX_DATA_PATH = config.DATA_FOLDER / "gowalla_data" / "Gowalla_totalCheckins.txt"
+    _EDGE_DATA_PATH = config.DATA_FOLDER / "gowalla_data" / "Gowalla_edges.txt"
 
     def __init__(self, rng: np.random.Generator, base_folder: Path):
         if not self._snap_data_present():

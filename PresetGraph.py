@@ -8,6 +8,7 @@ import graph_tool.all as gt  # type: ignore
 import csv
 import numpy as np
 
+import config
 from SIEpidemic import EdgeCostGen, EdgeGen, GenericEdgeGen, SIEpidemic
 from VertexSet import GenericVertexSetGen, VertexSet, VertexSetGen
 from WeightedVertexSet import GenericWeightGen, WeightedVertexSet, WeightGen
@@ -68,8 +69,8 @@ def extract_giant_data(data: GraphData) -> GraphData:
 class PresetGraph:
     """This class is intended for the common use case of generating a single graph that gets re-used for many
     experiments, e.g. from the Gowalla dataset."""
-    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = Path.cwd()):
         seed = seed_override if seed_override is not None else self.DEFAULT_SEED
+    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
         self.rng = np.random.default_rng(seed)
         self.base_folder = base_folder
 
