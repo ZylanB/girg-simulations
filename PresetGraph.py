@@ -69,8 +69,8 @@ def extract_giant_data(data: GraphData) -> GraphData:
 class PresetGraph:
     """This class is intended for the common use case of generating a single graph that gets re-used for many
     experiments, e.g. from the Gowalla dataset."""
-        seed = seed_override if seed_override is not None else self.DEFAULT_SEED
     def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
+        seed = seed_override if seed_override is not None else self.DEFAULT_SEED
         self.rng = np.random.default_rng(seed)
         self.base_folder = base_folder
 
