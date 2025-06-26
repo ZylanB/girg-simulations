@@ -10,7 +10,7 @@ from VertexSet import VertexSetGen
 from WeightedVertexSet import WeightedVertexSet, WeightGen
 
 
-class InitialVertexFunction(LoggableFunction[[WeightedVertexSet, np.random.Generator], int]):
+class InitialVertexFunction(LoggableFunction[[SIEpidemic, np.random.Generator], int]):
     """Function to choose the ID of the initial vertex of each run of an experiment. Includes a name for logging."""
     @property
     def function_role(self):
@@ -118,7 +118,7 @@ class SIExperiment:
                 elif self.resample_costs:
                     self.current_run.sample_edge_costs(self.rng)
 
-        initial_vertex_id = self.initial_vertex_fn(self.current_run.vertex_set, self.rng)
+        initial_vertex_id = self.initial_vertex_fn(self.current_run, self.rng)
         self.current_run.run_infection(initial_vertex_id=initial_vertex_id)
         self.results.append(self.result_fn(self.current_run, self.rng))
         if self.full_log:

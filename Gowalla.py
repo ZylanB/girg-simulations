@@ -259,7 +259,7 @@ class GowallaGen(PresetGen):
 
 class GowallaInitialVertexFn(InitialVertexFunction):
     def __init__(self):
-        self._function = lambda _: 164
+        self._function = lambda _, __: 164
         self.description = "User at (49.50, 11.44) near Nuremburg."
 
 
