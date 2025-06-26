@@ -33,9 +33,8 @@ class BasicTests(unittest.TestCase):
         self.d_id = vertices.name_to_id("d")
         self.e_id = vertices.name_to_id("e")
         self.f_id = vertices.name_to_id("f")
-        
-        self.edges = [(self.a_id, self.b_id), (self.b_id, self.c_id), (self.c_id, self.d_id), (self.d_id, self.a_id),
-                      (self.a_id, self.c_id), (self.a_id, self.e_id)]
+
+        self.edges = [("a", "b"), ("b", "c"), ("c", "d"), ("d", "a"), ("a", "c"), ("a", "e")]
         edge_gen = FixedGraphGen(edges=self.edges, description="Test graph")
         cost_gen = ConstantCostGen(1.)
 

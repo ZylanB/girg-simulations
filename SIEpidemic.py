@@ -356,10 +356,11 @@ class GirgGen(EdgeGen):
 
 class FixedGraphGen(EdgeGen):
     """'Edge generator' for a constant graph such as the Gowalla dataset, to be passed to SIEpidemic. The edges
-    should be specified as a list of pairs of vertex IDs."""
-    def __init__(self, edges: Sequence[Tuple[int, int]], description: str) -> None:
+    should be specified as a list of pairs of vertex names."""
+    def __init__(self, edges: Sequence[Tuple[Any, Any]], description: str) -> None:
         self.description = description
-        self._function = lambda _, __: edges
+        self._function = lambda vertex_set, __: [(vertex_set.name_to_id(e[0]),
+                                                  vertex_set.name_to_id(e[1])) for e in edges]
 
 
 class FPPCostGen(EdgeCostGen):
