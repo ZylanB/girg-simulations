@@ -141,9 +141,12 @@ class SIExperiment:
         if self.full_log and not (self.resample_vertices or self.resample_weights):
             self.current_run.save_vertices(self.log_path, run_index=None)
         for i in range(self.run_count):
+            print(f"Evaluating infection {i+1}/{self.run_count}...")
             # We don't bother resampling immediately before the first run, as we sampled once on initialisation.
             self._single_run(first_run=(i == 0))
             self._current_run_count += 1
+
+        print("Saving results...")
         self._log_results()
 
         return self.results
@@ -244,6 +247,7 @@ class SIExperiment:
             lines.extend(self.current_run.vertex_set.metric.log_lines)
 
         byte_lines = [line.encode("utf-8") for line in lines]
+        self.log_path.mkdir(exist_ok=True, parents=True)
         with open(self.log_path / self.settings_name, "wb") as file:
             file.writelines(byte_lines)
 
