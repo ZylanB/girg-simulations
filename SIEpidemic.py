@@ -83,18 +83,38 @@ class SIEpidemic:
 
     def sample_edge_costs(self, rng: np.random.Generator) -> None:
         """(Re)samples only the edge costs while maintaining the current edge set."""
-        for edge in self.graph.edges():
-            u_id = self.graph.vertex_index[edge.source()]
-            v_id = self.graph.vertex_index[edge.target()]
-            new_cost = self.cost_gen(rng)
-            new_cost *= self.vertex_set.penalty(u_id, v_id, mu=self.mu, zeta=self.zeta)
-            self.edge_costs[edge] = new_cost
+        # This is fairly well-optimised, and needs to be - it will be called with 10M+ edges.
+
+        print("Sampling edge costs...")
+
+        # Start with the numpy arrays of edge sources/destinations/IDs to avoid costly lookups.
+        edge_array = self.graph.get_edges([self.graph.edge_index])
+        u_array, v_array, id_array = edge_array.T
+
+        # Pull these into local variables to avoid recomputing them.
+        edge_count = self.graph.num_edges()
+        cost_gen = functools.partial(self.cost_gen, rng=rng)
+        penalty = functools.partial(self.vertex_set.penalty, mu=self.mu, zeta=self.zeta)
+
+        # Actually sample and compute the edge costs, again storing them in an nparray.
+        new_costs = np.empty(edge_count, dtype=float)
+        for i in range(edge_count):
+            new_costs[id_array[i]] = cost_gen() * penalty(u_array[i], v_array[i])
+
+        # Directly reassign the edge property's array to this new array rather than going edge-by-edge.
+        print("Loading new edge costs...")
+        self.edge_costs.a[:] = np.asarray(new_costs)
+
+        # The next step in optimisation here would be to vectorise penalty and cost_gen. Vectorising cost_gen would be
+        # easy, but only cut running times by 10-15% or so. Vectorising penalty would be more significant but would
+        # require encoding the distances as edge properties, which is a much bigger change.
 
     def run_infection(self, initial_vertex_id: int) -> None:
         """Runs an SI infection on the stored graph, storing the results in self.infection_time and self.infector.
         For each Vertex v in self.graph, self.infection_time[v] will be the infection time of v and self.infector[v]
         will be the node that infected v; these default to infinity (np.inf) and None respectively if v isn't in
         the same component as the initial vertex."""
+        print("Running infection...")
         self.initial_vertex = self.graph.vertex(initial_vertex_id)
 
         # Distances need to be initialised to infinity before running graph-tools' Dijkstra implementation.
