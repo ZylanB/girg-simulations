@@ -3,7 +3,7 @@ import unittest
 import config
 from Region import Region
 from figures.EpidemicCurves import (_get_infection_list, _get_run_datum, InfectionTimesAndRegions, InfectionDatum,
-                                    log_points, RunDatum)
+                                    log_points, RunDatum, process_infection_times)
 from SIEpidemic import FixedGraphGen, ConstantCostGen
 from SIExperiment import FixedInitialVertex, SIExperiment
 from VertexSet import EarthDistance, FixedVertexSet
@@ -51,6 +51,35 @@ class TestResultFunction(unittest.TestCase):
         self.assertEqual(datum, experiment.results[0])
         self.assertEqual(_get_run_datum(infections, i_points=[1, 2, 4, 5]), experiment.results[0])
 
+
+class TestDataProcessing(unittest.TestCase):
+    def test(self):
+        # Fictional vertices: 4 in the US, 4 in the EU, 2 elsewhere.
+        # Fictional run histories:
+        # run_a: t=0 US, t=1 EU,    t=2 other, t=3 US,  t=4 US,     t=5 EU,  t=6 other, t=7 EU,  t=8 EU,  t=9 US
+        # run_b: t=0 EU, t=2 US,    t=4 other, t=10 US, t=12 other, t=14 US, t=16 EU,   t=18 EU, t=20 US, t=22 EU
+        # run_c: t=0 US, t=3 other, t=6 other, t=9 EU,  t=11 US,    t=15 EU, t=18 EU,   t=21 EU, t=24 US, t=27 US
+        i_points = [1, 2, 4, 6, 8, 10]
+        run_a = RunDatum(i_points=i_points, infection_times=[0., 1., 3., 5., 7., 9.],
+                         region_counts={Region.US: [1, 1, 2, 3, 3, 4], Region.EU: [0, 1, 1, 2, 3, 4],
+                                        Region.OTHER: [0, 0, 1, 1, 2, 2]})
+        run_b = RunDatum(i_points=i_points, infection_times=[0., 2., 10., 14., 18., 22.],
+                         region_counts={Region.US: [0, 1, 2, 3, 3, 4], Region.EU: [1, 1, 1, 1, 3, 4],
+                                        Region.OTHER: [0, 0, 1, 2, 2, 2]})
+        run_c = RunDatum(i_points=i_points, infection_times=[0., 3., 9., 15., 21., 27.],
+                         region_counts={Region.US: [1, 1, 1, 2, 2, 4], Region.EU: [0, 0, 1, 2, 4, 4],
+                                        Region.OTHER: [0, 1, 2, 2, 2, 2]})
+        curves = process_infection_times(runs=[run_a, run_b, run_c], top=75, bottom=25)
+
+        self.assertEqual(curves.median_curve, [0., 2., 9., 14., 18., 22.])
+        self.assertEqual(curves.bottom_curve, [0., 1., 3., 5., 7., 9.])
+        self.assertEqual(curves.top_curve, [0., 3., 10., 15., 21., 27.])
+
+        # The median run is run_a at 1 infection (as the first run in the list with the median value), run_c at 4
+        # infections, and run_b at all other i_points.
+        self.assertEqual(curves.region_medians[Region.US], [1, 1, 1, 3, 3, 4])
+        self.assertEqual(curves.region_medians[Region.EU], [0, 1, 1, 1, 3, 4])
+        self.assertEqual(curves.region_medians[Region.OTHER], [0, 0, 2, 2, 2, 2])
 
 
 if __name__ == '__main__':

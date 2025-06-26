@@ -16,7 +16,7 @@ from SIExperiment import SIExperiment, ResultFunction, InitialVertexFunction, Fi
 
 
 
-RUN_COUNT = 5
+RUN_COUNT = 55
 PLOT_PRECISION = 4  # Increase to plot at a finer scale
 
 
@@ -187,9 +187,9 @@ def process_infection_times(runs: List[RunDatum], bottom: int, top: int) -> Epid
     # Goes from [[run 1 time 1, ..., run 1 time n], ..., [run n time 1, ..., run n time n]] to
     # [[run 1 time 1, ..., run n time 1], ..., [run 1 time n, ..., run n time n]]
     zipped_times = list(zip(*[datum.infection_times for datum in runs]))
-    bottom_curve = [float(np.percentile(infections, bottom)) for infections in zipped_times]
-    median_curve = [float(np.percentile(infections, 50)) for infections in zipped_times]
-    top_curve = [float(np.percentile(infections, top)) for infections in zipped_times]
+    bottom_curve = [float(np.percentile(infections, bottom, method="nearest")) for infections in zipped_times]
+    median_curve = [float(np.percentile(infections, 50, method="nearest")) for infections in zipped_times]
+    top_curve = [float(np.percentile(infections, top, method="nearest")) for infections in zipped_times]
 
     region_medians = {r: [] for r in Region}
     for x in range(len(i_points)):
@@ -232,8 +232,7 @@ if __name__ == '__main__':
     if len(CURVE_PARAMS) != len(SEEDS) or len(CURVE_PARAMS) != len(PLOT_PARAMS):
         raise RuntimeError("Mismatched plot parameters!")
 
-    # for i in range(len(CURVE_PARAMS)):
-    for i in [0, 1, 2, 3]:
+    for i in range(len(CURVE_PARAMS)):
         print(f"Getting infection data for graph {i}...")
         data = generate_data(CURVE_PARAMS[i], seed=SEEDS[i], name=f"epidemic-curve-{i}")
         print(f"Processing data for graph {i}...")
