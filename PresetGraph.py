@@ -92,7 +92,7 @@ class PresetGraph:
     def graph_generator_class(self) -> Type[PresetGen]:
         raise NotImplementedError
 
-    def _get_vertices(self, _: np.random.Generator):
+    def _vertex_gen_fn(self, _: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
@@ -101,17 +101,29 @@ class PresetGraph:
             generator.save_data()
             return generator.vertices
         print("Loading vertices...")
-        with open(generator.vertex_path, "rb") as file:
-            return dill.load(file)
+        return generator.vertices_from_file()
+
+    @property
+    def graph_data(self) -> GraphData:
+        """Returns the vertices/weights/edges of the graph in "raw" form, e.g. for use with another PresetGen."""
+        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
+        if not generator.data_exists:
+            generator.create_data()
+            generator.save_data()
+            return GraphData(vertex_set=generator.vertices, weights=generator.weights, edge_list=generator.edge_list)
+
+        print("Loading data...")
+        return GraphData(vertex_set=generator.vertices_from_file(), weights=generator.weights_from_file(),
+                         edge_list=generator.edge_list_from_file())
 
     @property
     def vertex_gen(self):
         """Vertex generator function to pass into an SIExperiment. If the graph data exists, loads the vertex set and
         returns it. Otherwise, creates all the graph files and returns the vertex set. This approach means when we log
         the vertex generator function we don't have to store the entire (large) vertex set."""
-        return GenericVertexSetGen(_function=self._get_vertices, description=self.description)
+        return GenericVertexSetGen(_function=self._vertex_gen_fn, description=self.description)
 
-    def _get_weights(self, _: VertexSet, __: np.random.Generator):
+    def _weight_gen_fn(self, _: VertexSet, __: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
@@ -120,17 +132,16 @@ class PresetGraph:
             generator.save_data()
             return generator.weights
         print("Loading weights...")
-        with open(generator.weight_path, "rb") as file:
-            return dill.load(file)
+        return generator.weights_from_file()
 
     @property
     def weight_gen(self):
         """Weight generator function to pass into an SIExperiment. If the graph data exists, loads the vertex weights
         and returns them. Otherwise, creates all the graph files and returns the weights. This approach means when we
         log the weight generator function we don't have to store the entire (large) weight list."""
-        return GenericWeightGen(_function=self._get_weights, description=self.description)
+        return GenericWeightGen(_function=self._weight_gen_fn, description=self.description)
 
-    def _get_edges(self, _: WeightedVertexSet, __: np.random.Generator):
+    def _edge_gen_fn(self, _: WeightedVertexSet, __: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
         generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
@@ -139,19 +150,14 @@ class PresetGraph:
             generator.save_data()
             return generator.edge_list
         print("Loading edges...")
-        with open(generator.edge_path, "r") as file:
-            edge_list = []
-            reader = csv.reader(file, delimiter=",")
-            for row in reader:
-                edge_list.append((int(row[0]), int(row[1])))
-        return edge_list
+        return generator.edge_list_from_file()
 
     @property
     def edge_gen(self):
         """Edge generator function to pass into an SIExperiment. If the graph data exists, loads the edge list and
         returns it. Otherwise, creates all the graph files and returns the edges. This approach means when we log the
         edge generator function we don't have to store the entire (large) edge list."""
-        return GenericEdgeGen(_function=self._get_edges, description=self.description)
+        return GenericEdgeGen(_function=self._edge_gen_fn, description=self.description)
 
     def create_epidemic(self, cost_gen: EdgeCostGen, mu: float, zeta: float, name: str,
                         rng: np.random.Generator) -> SIEpidemic:
@@ -229,8 +235,24 @@ class PresetGen:
         # Using csv rather than dill because dill is slooooowwww for large objects and the edge sets can be 180+MB.
         print("Saving edge list...")
         with open(self.edge_path, "w") as file:
-            writer = csv.writer(file, delimiter=',')
+            writer = csv.writer(file, delimiter=',')  # type: ignore
             for entry in self.edge_list:
                 writer.writerow(entry)
 
         print("All saved.")
+
+    def vertices_from_file(self) -> VertexSet:
+        with open(self.vertex_path, "rb") as file:
+            return dill.load(file)
+
+    def weights_from_file(self) -> Sequence[float]:
+        with open(self.weight_path, "rb") as file:
+            return dill.load(file)
+
+    def edge_list_from_file(self) -> Sequence[Tuple[int, int]]:
+        edge_list = []
+        with open(self.edge_path, "r") as file:
+            reader = csv.reader(file, delimiter=",")
+            for row in reader:
+                edge_list.append((int(row[0]), int(row[1])))
+        return edge_list

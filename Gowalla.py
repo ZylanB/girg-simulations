@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import requests
 
-from PresetGraph import PresetGraph, PresetGen
 import config
+from PresetGraph import extract_giant_data, GraphData, PresetGraph, PresetGen
 from SIEpidemic import GirgGen
 from SIExperiment import InitialVertexFunction
 from VertexSet import EarthDistance, VertexSet, PoissonPointProcess, TorusDistance
@@ -291,28 +291,34 @@ class SyntheticGowallaGen(PresetGen):
         edge_gen = GirgGen(alpha=SYN_GOWALLA_ALPHA, scale_factor=1 / SYN_GOWALLA_SIZE)
         edges = edge_gen(vertex_set, self.rng)
 
-        print("Loading GIRG...")
-        graph = gt.Graph(directed=False)
-        graph.add_vertex(n=vertex_set.size)
-        graph.add_edge_list(edges)
-        print("Finding giant component...")
-        giant = gt.extract_largest_component(graph)
+        original_data = GraphData(vertex_set=vertex_set.vertices, weights=vertex_set.weights, edge_list=edges)
+        giant_data = extract_giant_data(original_data)
+        self.vertices, self.weights, self.edge_list = giant_data.vertex_set, giant_data.weights, giant_data.edge_list
 
-        print("Renumbering vertices of giant component...")
-        induced_vertex_ids = [int(v) for v in giant.vertices()]
-        name_to_pos_dict = {i: vertex_set.id_to_position(i) for i in induced_vertex_ids}
-        self.vertices = VertexSet(dimension=2, metric=TorusDistance(d=2, size=SYN_GOWALLA_SIZE))
-        self.vertices.set_points_from_names(name_to_pos_dict)
 
-        self.weights = [0.] * len(induced_vertex_ids)
-        for i in induced_vertex_ids:
-            self.weights[self.vertices.name_to_id(i)] = vertex_set.weights[i]
-        if 0. in self.weights:
-            raise RuntimeError(f"Something's badly wrong.")
+class GowallaGiantGraph(PresetGraph):
+    @property
+    def default_seed(self) -> int:
+        return 243696392762333123792045834049537897896
 
-        old_to_new = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
-        giant_edge_list = list(giant.edges())
-        self.edge_list = [(old_to_new[i], old_to_new[j]) for (i, j) in giant_edge_list]
+    @property
+    def description(self) -> str:
+        return f"""Preset graph generated from the giant component of the Gowalla dataset with GowallaGiantGen."""
+
+    @property
+    def graph_generator_class(self) -> Type[PresetGen]:
+        return GowallaGiantGen
+
+
+class GowallaGiantGen(PresetGen):
+    @property
+    def name(self):
+        return "gowalla-giant"
+
+    def create_data(self) -> None:
+        original_gowalla = GowallaGraph()
+        giant_data = extract_giant_data(original_gowalla.graph_data)
+        self.vertices, self.weights, self.edge_list = giant_data.vertex_set, giant_data.weights, giant_data.edge_list
 
 
 def plot_tie_data(data: Sequence[TieDatum]):

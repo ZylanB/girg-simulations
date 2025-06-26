@@ -1,5 +1,4 @@
 import datetime
-from pathlib import Path
 import unittest
 
 import graph_tool.topology  # type: ignore
@@ -9,10 +8,9 @@ import config
 from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph, GowallaGiantGraph
 from SIEpidemic import GenericEdgeCostGen, SIEpidemic
 from TestDistribution import dkw_p_value
-from PresetGraph import PresetGen
+from PresetGraph import PresetGen, extract_giant_data
 
-
-TEST_SAVE_FOLDER = Path.cwd() / "test_files"
+TEST_SAVE_FOLDER = config.TEST_FOLDER
 
 
 def clear_single_test_files() -> None:
@@ -216,7 +214,7 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(original_edge_pairs, loaded_edge_pairs)
 
 
-class GraphTests(unittest.TestCase):
+class GowallaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
@@ -237,6 +235,9 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(sizes[0], 1)
         self.assertEqual(sizes[-2], 13)
         self.assertEqual(sizes[-1], 96953)
+
+        # Our initial vertex.
+        self.assertEqual(self.vertex_set.name_to_position(164), (49.514555, 11.4177007667))
 
     def test_edge_directionality(self):
         self.assertFalse(self.graph.is_directed())
@@ -287,13 +288,40 @@ class SyntheticGowallaTests(unittest.TestCase):
     def test_parameters(self):
         """Make sure we're generating the right graph."""
         syn_gowalla = SyntheticGowallaGraph(base_folder=TEST_SAVE_FOLDER)
-        cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
-        epidemic = syn_gowalla.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
-                                               rng=np.random.default_rng())
+        data = syn_gowalla.graph_data
 
-        self.assertEqual(epidemic.vertex_set.size, 249659)
-        self.assertEqual(len(list(epidemic.graph.edges())), 10885797)
+        self.assertEqual(data.vertex_set.size, 249659)
+        self.assertEqual(len(data.edge_list), 10881354)
 
+        # This should already be connected, so extract_giant_data should do nothing.
+        data = syn_gowalla.graph_data
+        giant_giant_data = extract_giant_data(data)
+        self.assertEqual(giant_giant_data.vertex_set.size, 96953)
+        self.assertEqual(giant_giant_data.weights, data.weights)
+        self.assertEqual(giant_giant_data.edge_list, data.edge_list)
+
+
+class GowallaGiantTests(unittest.TestCase):
+    def setUp(self):
+        clear_graph_files()
+
+    def tearDown(self):
+        clear_graph_files()
+
+    def test_parameters(self):
+        """Make sure we're picking the right component."""
+        data = GowallaGiantGraph(base_folder=TEST_SAVE_FOLDER).graph_data
+
+        # Note agreement with GowallaTests.test_parameters for these tests.
+        self.assertEqual(data.vertex_set.size, 96953)
+        self.assertEqual(len(data.edge_list), 455026)
+        self.assertEqual(data.vertex_set.name_to_position(164), (49.514555, 11.4177007667))
+
+        # This should already be connected, so extract_giant_data should do nothing.
+        giant_giant_data = extract_giant_data(data)
+        self.assertEqual(giant_giant_data.vertex_set.size, 96953)
+        self.assertEqual(giant_giant_data.weights, data.weights)
+        self.assertEqual(giant_giant_data.edge_list, data.edge_list)
 
 if __name__ == '__main__':
     unittest.main()
