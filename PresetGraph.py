@@ -70,12 +70,12 @@ class PresetGraph:
     """This class is intended for the common use case of generating a single graph that gets re-used for many
     experiments, e.g. from the Gowalla dataset."""
     def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
-        seed = seed_override if seed_override is not None else self.DEFAULT_SEED
+        seed = seed_override if seed_override is not None else self.default_seed
         self.rng = np.random.default_rng(seed)
         self.base_folder = base_folder
 
     @property
-    def DEFAULT_SEED(self) -> int:
+    def default_seed(self) -> int:
         """We need to use a different RNG to generate the graph than we use to run the SIExperiment it's used in,
         or the results of the experiment for a given seed will depend on whether the graph's files are present. As
         such, intended use is to generate a random seed (np.random.SeedSequence().entropy) once and then hardcode it

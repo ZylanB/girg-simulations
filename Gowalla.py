@@ -92,7 +92,7 @@ class GowallaGraph(PresetGraph):
         return "Preset graph generated from the Gowalla dataset with the GowallaGen class."
 
     @property
-    def DEFAULT_SEED(self) -> int:
+    def default_seed(self) -> int:
         return 300574007011361565096923362210003471256
 
     @property
@@ -265,7 +265,7 @@ class GowallaInitialVertexFn(InitialVertexFunction):
 
 class SyntheticGowallaGraph(PresetGraph):
     @property
-    def DEFAULT_SEED(self) -> int:
+    def default_seed(self) -> int:
         return 276482048599935051615627698249100747258
 
     @property
