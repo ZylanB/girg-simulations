@@ -17,6 +17,11 @@ class InitialVertexFunction(LoggableFunction[[SIEpidemic, np.random.Generator], 
         return "Initial vertex selector"
 
 
+class FixedInitialVertex(InitialVertexFunction):
+    def __init__(self, name: Any):
+        self._function = lambda epidemic, _: epidemic.vertex_set.name_to_id(name)
+
+
 class GenericInitialVertexFunction(InitialVertexFunction):
     """Lightweight option to just pass in the function you care about with a description for logging."""
     def __init__(self, _function, description: str) -> None:

@@ -3,7 +3,7 @@ import unittest
 
 import config
 from SIEpidemic import GenericEdgeCostGen, GenericEdgeGen, FPPCostGen, GirgGen
-from SIExperiment import SIExperiment, GenericInitialVertexFunction, GenericResultFunction
+from SIExperiment import SIExperiment, GenericResultFunction, FixedInitialVertex
 from VertexSet import GenericVertexSetGen, FixedVertexSet, EuclideanDistance, PoissonPointProcess
 from WeightedVertexSet import GenericWeightGen, PowerLawWeightGen, IdentityWeightScaler
 
@@ -80,7 +80,7 @@ class FileIOTests(unittest.TestCase):
         self.varying_cost_gen = GenericEdgeCostGen(_test_cost_gen, "Varying test cost generator")
         self.varying_vertex_gen = GenericVertexSetGen(_test_vertex_gen, "Varying test vertex generator")
 
-        self.initial_vertex_fn = GenericInitialVertexFunction(lambda _, __: 0, "Zero vertex")
+        self.initial_vertex_fn = FixedInitialVertex(0)
         self.edge_count = GenericResultFunction(lambda epi, _: epi.graph.num_edges(), "Edge count")
         self.sum_weights = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
         self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.size, description="Vertex count")
@@ -277,8 +277,7 @@ class FileIOTests(unittest.TestCase):
             seed==99217604857427484066604220485342406204
             mu==1.0
             zeta==1.0
-            Initial vertex selector of type <class 'SIExperiment.GenericInitialVertexFunction'>:
-            \tdescription==Zero vertex
+            Initial vertex selector of type <class 'SIExperiment.FixedInitialVertex'>:
             Test result extractor of type <class 'SIExperiment.GenericResultFunction'>:
             \tdescription==Edge count
             Vertex set generator of type <class 'VertexSet.GenericVertexSetGen'>:
@@ -306,7 +305,7 @@ class SeedSavingTests(unittest.TestCase):
         edge_gen = GirgGen(alpha=1.5, scale_factor=1 / 10)
         cost_gen = FPPCostGen(lambda_=1)
         result_fn = GenericResultFunction(lambda _, __: None, "Throw away results")
-        initial_vertex_fn = GenericInitialVertexFunction(lambda _, __: 0, "Zero vertex")
+        initial_vertex_fn = FixedInitialVertex(0)
 
         self.original = SIExperiment(vertex_gen=vertex_gen, weight_gen=weight_gen, edge_gen=edge_gen, cost_gen=cost_gen,
                                      run_count=4, resample_edges=True, resample_costs=True, resample_weights=True,
