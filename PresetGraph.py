@@ -1,8 +1,10 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Type, TypedDict
 
 import dill  # type: ignore
+import graph_tool.all as gt  # type: ignore
 import csv
 import numpy as np
 
@@ -26,6 +28,43 @@ class PresetSIExperimentArgs(TypedDict):
     resample_edges: bool
     resample_weights: bool
     resample_vertices: bool
+
+
+@dataclass
+class GraphData:
+    vertex_set: VertexSet
+    weights: Sequence[float]  # List of weights indexed by vertex ID
+    edge_list: Sequence[Tuple[int, int]]  # List of edges indexed by vertex ID, direction doesn't matter
+
+
+def extract_giant_data(data: GraphData) -> GraphData:
+    """Pulls out vertex, weight and edge data for the largest component of the epidemic's graph. Ties are broken
+    deterministically. Pulled out of the SIEpidemic class for efficiency/neatness."""
+    print("Loading graph...")
+    graph = gt.Graph(directed=False)
+    graph.add_vertex(n=data.vertex_set.size)
+    graph.add_edge_list(data.edge_list)
+
+    print("Finding giant component...")
+    giant = gt.extract_largest_component(graph)
+
+    print("Renumbering vertices of giant component...")
+    induced_vertex_ids = [int(v) for v in giant.vertices()]
+    name_to_pos_dict = {i: data.vertex_set.id_to_position(i) for i in induced_vertex_ids}
+    giant_vertex_set = VertexSet(dimension=2, metric=data.vertex_set.metric)
+    giant_vertex_set.set_points_from_names(name_to_pos_dict)
+
+    giant_weights = [0.] * len(induced_vertex_ids)
+    for i in induced_vertex_ids:
+        giant_weights[giant_vertex_set.name_to_id(i)] = data.weights[i]
+    if 0. in giant_weights:
+        raise RuntimeError(f"Something's badly wrong.")
+
+    old_to_new = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
+    giant_edge_list = list(giant.edges())
+    giant_edge_list = [(old_to_new[i], old_to_new[j]) for (i, j) in giant_edge_list]
+
+    return GraphData(vertex_set=giant_vertex_set, weights=giant_weights, edge_list=giant_edge_list)
 
 
 class PresetGraph:
