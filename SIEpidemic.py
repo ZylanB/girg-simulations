@@ -93,7 +93,7 @@ class SIEpidemic:
 
         # Pull these into local variables to avoid recomputing them.
         edge_count = self.graph.num_edges()
-        cost_gen = functools.partial(self.cost_gen, rng=rng)
+        cost_gen = functools.partial(self.cost_gen, rng)
         penalty = functools.partial(self.vertex_set.penalty, mu=self.mu, zeta=self.zeta)
 
         # Actually sample and compute the edge costs, again storing them in an nparray.
