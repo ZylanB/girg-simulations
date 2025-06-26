@@ -102,7 +102,6 @@ class SIEpidemic:
             new_costs[id_array[i]] = cost_gen() * penalty(u_array[i], v_array[i])
 
         # Directly reassign the edge property's array to this new array rather than going edge-by-edge.
-        print("Loading new edge costs...")
         self.edge_costs.a[:] = np.asarray(new_costs)
 
         # The next step in optimisation here would be to vectorise penalty and cost_gen. Vectorising cost_gen would be
