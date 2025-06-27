@@ -2,7 +2,7 @@ import unittest
 
 import config
 from Region import Region
-from figures.EpidemicCurves import (_get_infection_list, _get_run_datum, InfectionTimesAndRegions, InfectionDatum,
+from figures.EpidemicCurves import (get_infection_list, get_run_datum, InfectionTimesAndRegions, InfectionDatum,
                                     log_points, RunDatum, process_infection_times)
 from SIEpidemic import FixedGraphGen, ConstantCostGen
 from SIExperiment import FixedInitialVertex, SIExperiment
@@ -44,12 +44,12 @@ class TestResultFunction(unittest.TestCase):
         infections = [InfectionDatum(time=0., region=Region.US), InfectionDatum(time=1., region=Region.EU),
                       InfectionDatum(time=2., region=Region.EU), InfectionDatum(time=3., region=Region.OTHER),
                       InfectionDatum(time=4., region=Region.US), InfectionDatum(time=5., region=Region.EU)]
-        self.assertEqual(_get_infection_list(experiment.current_run), infections)
+        self.assertEqual(get_infection_list(experiment.current_run), infections)
 
         datum = RunDatum(i_points=[1, 2, 4, 5], infection_times=[0., 1., 3., 4.],
                          region_counts={Region.US: [1, 1, 1, 2], Region.EU: [0, 1, 2, 2], Region.OTHER: [0, 0, 1, 1]})
         self.assertEqual(datum, experiment.results[0])
-        self.assertEqual(_get_run_datum(infections, i_points=[1, 2, 4, 5]), experiment.results[0])
+        self.assertEqual(get_run_datum(infections, i_points=[1, 2, 4, 5]), experiment.results[0])
 
 
 class TestDataProcessing(unittest.TestCase):

@@ -2,7 +2,7 @@ from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 import functools
 from math import ceil, log2, log10
-from typing import List, Mapping, Optional, Sequence, Tuple, Type
+from typing import List, Mapping, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
@@ -11,30 +11,44 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 import config
-from PresetGraph import PresetGraph
-from Gowalla import SyntheticGowallaGraph, GowallaGiantGraph
 from Region import Region, region_from_position
-from SIEpidemic import SIEpidemic, FPPCostGen
-from SIExperiment import SIExperiment, ResultFunction, InitialVertexFunction, FixedInitialVertex
-
-
-RUN_COUNT = 55
-PLOT_PRECISION = 4  # Increase to plot at a finer scale
+from SIEpidemic import FPPCostGen, SIEpidemic
+from SIExperiment import FixedInitialVertex, ResultFunction, SIExperiment
+from figures.EpidemicCurvesConfig import (CurveParams, CURVE_PARAMS, PlotParams, PLOT_PARAMS, PLOT_PRECISION, RUN_COUNT,
+                                          SEEDS)
 
 
 @dataclass
 class InfectionDatum:
+    """An infection time stored alongside its region."""
     time: float
     region: Region
+
+
+@dataclass
+class RunDatum:
+    """All the information we'd need to plot an epidemic curve for a given run if we were doing it in isolation."""
+    i_points: Sequence[int]
+    infection_times: Sequence[float]  # infection_times[x] is the time taken to infect i_points[x] vertices.
+    # region_counts[R][x] is the number of infected vertices in region R at time infection_times[x].
+    region_counts: Mapping[Region, List[int]]
 
 
 class InfectionTimesAndRegions(ResultFunction):
     """Returns a list of InfectionDatums sorted by time."""
     def __init__(self, cutoff: int, precision: int = PLOT_PRECISION):
-        self._function = functools.partial(_get_result, cutoff=cutoff, precision=precision)
+        self._function = functools.partial(self._get_result, cutoff=cutoff, precision=precision)
+
+    @staticmethod
+    def _get_result(epidemic: SIEpidemic, _: np.random.Generator, cutoff: int, precision: int) -> RunDatum:
+        infection_list = get_infection_list(epidemic)
+        i_points = log_points(max_datum=cutoff, precision=precision)
+        return get_run_datum(infection_list, i_points)
 
 
-def _get_infection_list(epidemic: SIEpidemic) -> List[InfectionDatum]:
+def get_infection_list(epidemic: SIEpidemic) -> List[InfectionDatum]:
+    """Returns a list of all infections in the epidemic, sorted by time. Each infection has its region stored
+    alongside it in an InfectionDatum."""
     infections = []
     for v in epidemic.graph.vertices():
         v_position = epidemic.vertex_set.id_to_position(int(v))
@@ -46,18 +60,9 @@ def _get_infection_list(epidemic: SIEpidemic) -> List[InfectionDatum]:
     return infections
 
 
-@dataclass
-class RunDatum:
-    """All the information we'd need to plot epidemic curves for a given run if we were doing it in isolation."""
-    i_points: Sequence[int]
-    infection_times: Sequence[float]  # infection_times[x] is the time taken to infect i_points[x] vertices.
-    # region_counts[R][x] is the number of infected vertices in region R at time infection_times[x].
-    region_counts: Mapping[Region, List[int]]
-
-
-def _get_run_datum(infection_data: List[InfectionDatum], i_points: List[int]) -> RunDatum:
-    """Takes the raw infection data from a run and turns it into a RunDatum."""
-
+def get_run_datum(infection_data: List[InfectionDatum], i_points: List[int]) -> RunDatum:
+    """Takes the raw infection data from a run and turns it into a RunDatum, containing i_points, the times at which we
+    pass the infection thresholds given by i_points, and regional breakdowns of infections at those times."""
     infection_times = []
     region_counts = {r: [] for r in Region}
     region_running_totals = {r: 0 for r in Region}
@@ -71,79 +76,15 @@ def _get_run_datum(infection_data: List[InfectionDatum], i_points: List[int]) ->
     return RunDatum(i_points=i_points, infection_times=infection_times, region_counts=region_counts)
 
 
-def _get_result(epidemic: SIEpidemic, _: np.random.Generator, cutoff: int, precision: int) -> RunDatum:
-        infection_list = _get_infection_list(epidemic)
-        i_points = log_points(max_datum=cutoff, precision=precision)
-        return _get_run_datum(infection_list, i_points)
-
-
-@dataclass
-class CurveParams:
-    graph: Type[PresetGraph]
-    initial: InitialVertexFunction
-    result_fn: ResultFunction
-    mu: float
-    zeta: float
-
-
-@dataclass
-class PlotParams:
-    log_t: bool
-    region_inset: bool
-    psi_inset_infection_range: Optional[Tuple[int, int]]
-
-
-GOWALLA_INITIAL = 164
-GOWALLA_CUTOFF = 64635
-GOWALLA_XI_RANGE = (150, 5000)
-GOWALLA_PARAMS = {"graph": GowallaGiantGraph, "initial": FixedInitialVertex(name=GOWALLA_INITIAL),
-                  "result_fn": InfectionTimesAndRegions(cutoff=GOWALLA_CUTOFF)}
-SYN_GOWALLA_CUTOFF = 166667
-SYN_GOWALLA_INITIAL = 230563
-SYN_GOWALLA_XI_RANGE = (150, SYN_GOWALLA_CUTOFF)
-SYN_GOWALLA_PARAMS = {"graph": SyntheticGowallaGraph, "initial": FixedInitialVertex(name=SYN_GOWALLA_INITIAL),
-                      "result_fn": InfectionTimesAndRegions(cutoff=SYN_GOWALLA_CUTOFF)}
-CURVE_PARAMS: List[CurveParams] = [
-    CurveParams(**GOWALLA_PARAMS, mu=0.0, zeta=0.0),
-    CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=0.0),
-    CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=2.0),
-    CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=3.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=0.0, zeta=0.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=1.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=2.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=3.0)
-]
-
-PLOT_PARAMS: List[PlotParams] = [
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
-    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
-    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
-    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False),
-    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False)
-]
-
-SEEDS = [
-    257135840227949566337238051408055634111,
-    303903392100660574452661293122954292079,
-    207575285627819734050983420268628288457,
-    336827387627079923696399650174942918686,
-    175837567687085788645530192316345259609,
-    233657882610370377508087340942845579878,
-    139102178419114034645107386879574426047,
-    90012362361482529980268819803967658146
-]
-
-
 def generate_data(params: CurveParams, seed: int, name: str) -> List[RunDatum]:
     """Returns sorted lists of RUN_COUNT infection times for independent infections of the given graph."""
     graph = params.graph()
     cost_gen = FPPCostGen(lambda_=1)
-    experiment = SIExperiment(**graph.experiment_params, resample_costs=True, initial_vertex_fn=params.initial,
-                              result_fn=params.result_fn, run_count=RUN_COUNT, log_path=config.FIGURE_FOLDER,
-                              mu=params.mu, zeta=params.zeta, seed=seed, full_log=False, name=name, cost_gen=cost_gen)
+    result_fn = InfectionTimesAndRegions(cutoff=params.infection_cutoff)
+    initial_fn = FixedInitialVertex(name=params.initial_name)
+    experiment = SIExperiment(**graph.experiment_params, resample_costs=True, initial_vertex_fn=initial_fn,
+                              result_fn=result_fn, run_count=RUN_COUNT, log_path=config.FIGURE_FOLDER, mu=params.mu,
+                              zeta=params.zeta, seed=seed, full_log=False, name=name, cost_gen=cost_gen)
 
     if experiment.results_exist:
         print("Loading from file...")
@@ -162,7 +103,7 @@ class EpidemicCurveData:
     top_curve: Sequence[float]     # Points to plot on the x axis for the top error curve
 
     # Points to plot on the y axis in the geographic inset. So region_medians[EU][x] answers: "When i_points[x] total
-    # vertices were infected, how many of those were in the EU? All of these are taken from a single "median run" so
+    # vertices were infected, how many of those were in the EU? All of these are taken from a single medoid run so
     # they add up to the total infection count.
     region_medians: Mapping[Region, Sequence[int]]
 
@@ -198,33 +139,25 @@ def process_infection_times(runs: List[RunDatum], bottom: int, top: int) -> Epid
     l2_from_median = lambda r: sum([(r.infection_times[x] - median_curve[x]) ** 2 for x in range(len(i_points))])
     medoid_run = min(runs, key=l2_from_median)
 
-    # region_medians = {r: [] for r in Region}
-    # for x in range(len(i_points)):
-    #     median_run = [run for run in runs if run.infection_times[x] == median_curve[x]][0]
-    #     for r in Region:
-    #         region_medians[r].append(median_run.region_counts[r][x])
-
     return EpidemicCurveData(i_points=i_points, bottom_curve=bottom_curve, median_curve=median_curve,
                              top_curve=top_curve, region_medians=medoid_run.region_counts)
 
-def exp_formatter(y, _):
-    if y <= 0:
-        return str(y)
-    exponent = int(round(log10(y)))
-    return rf"$10^{{{exponent}}}$"
-
-def percent_formatter(y, _):
-    return f"{int(round(y,0))}%"
 
 def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, int]):
+    """Plots an inset on the current figure showing a linear regression (on a log-log scale) determining the slope
+    of the graph in the given infection_range of y coordinates."""
     # Sets start_index to the first plotted infection count greater than infection_range[0]-1, i.e. the first plotted
     # infection count which is at least infection_range[0].
     start_index = bisect_right(curve_data.i_points, infection_range[0] - 1)
     # Sets end_point to the first plotted infection count greater than infection_range[1]. This means the last point
     # of the start_index:end_point slice will be the last plotted infection count which is at most infection_range[1].
     end_index = bisect_left(curve_data.i_points, infection_range[1] + 1)
-    log_times = [log10(t) for t in curve_data.median_curve[start_index:end_index]]
-    log_infections = [log10(x) for x in curve_data.i_points[start_index:end_index]]
+
+    # These are the data points we'll use for the regression.
+    time_coords = curve_data.median_curve[start_index:end_index]
+    infection_coords = curve_data.i_points[start_index:end_index]
+    log_times = [log10(t) for t in time_coords]
+    log_infections = [log10(x) for x in infection_coords]
 
     # Run the linear regression.
     reshaped_log_times = [[t] for t in log_times]
@@ -232,8 +165,6 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     model.fit(reshaped_log_times, log_infections)
 
     # Points to plot in the inset.
-    time_coords = curve_data.median_curve[start_index:end_index]
-    infection_coords = curve_data.i_points[start_index:end_index]
     regression_infection_coords = [model.intercept_ + model.coef_[0] * t for t in log_times]
 
     # Pass to inset.
@@ -241,25 +172,24 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     inset_axes = plt.axes((0.15, 0.47, 0.28, 0.43))
     plt.sca(inset_axes)
 
-    plt.plot(time_coords, infection_coords, linewidth=6, color="gray", linestyle="dashed")
-    plt.plot(time_coords, [10**x for x in regression_infection_coords], linewidth=3, color="red")
+    plt.grid(visible=True)
 
     # Bare axes with log/log scale.
     plt.xscale("log", base=10)
     plt.yscale("log", base=10)
-    plt.grid(visible=True)
-
     inset_axes.tick_params(which="both", bottom=False, top=False, left=False, right=False, labelbottom=False,
                            labelleft=False)
 
     # Zoomed-in plot of linear regression overlaid on the true value.
     plt.xlim(time_coords[0], time_coords[-1])
     plt.ylim(infection_coords[0], infection_coords[-1])
+    plt.plot(time_coords, infection_coords, linewidth=6, color="gray", linestyle="dashed")
+    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="red")
 
     # Print the slope of the linear regression.
     plt.title(rf"$2\psi = {round(model.coef_[0], 2)}$")
 
-    # Indicate boundaries of inset plot with dotted grey lines. Set the coordinates first.
+    # Indicate boundaries of the inset plot with dotted grey lines. Set the coordinates first.
     inset_right_edge_x = inset_axes.get_xlim()[1]
     inset_bottom_edge_y = inset_axes.get_ylim()[0]
     inset_top_edge_y = inset_axes.get_ylim()[1]
@@ -270,7 +200,6 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
 
     # Pass back to main figure before drawing the lines.
     plt.sca(main_axes)
-
     bottom_patch = ConnectionPatch(xyA=main_bottom_left, coordsA=main_axes.transData, xyB=inset_bottom_right,
                                    coordsB=inset_axes.transData, color="grey", linewidth=2, linestyle="dotted")
     plt.gcf().add_artist(bottom_patch)
@@ -279,12 +208,14 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     plt.gcf().add_artist(top_patch)
 
 
-def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
-    # Pass to inset.
-    main_axes = plt.gca()
-    inset_axes = plt.axes((0.625, 0.15, 0.25, 0.25))
-    plt.sca(inset_axes)
+def percent_formatter(y, _):
+    """Formatter for the y axis of the regional inset."""
+    return f"{int(round(y,0))}%"
 
+
+def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
+    """Plots an inset on the current figure showing cumulative infection totals in the different regions (EU/US/other).
+    If log_t is True, then the time/x axis is shown in logarithmic scale."""
     # At each infection count, get the breakdown into proportions in the EU/US/other regions.
     point_count = len(curve_data.i_points)
     region_medians = curve_data.region_medians
@@ -300,11 +231,19 @@ def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
 
     median_curve = curve_data.median_curve
 
+    # Pass to inset.
+    main_axes = plt.gca()
+    inset_axes = plt.axes((0.625, 0.15, 0.25, 0.25))
+    plt.sca(inset_axes)
+
     plt.grid(visible=True)
-    inset_axes.margins(x=0)
+    inset_axes.margins(x=0)  # Margins on the x axis look weird.
+
+    # The y axis here is a percentage of infected vertices from a given region.
     inset_axes.set_yticks([0, 25, 50, 75, 100])
     plt.ylim(0, 100)
     inset_axes.yaxis.set_major_formatter(FuncFormatter(percent_formatter))
+
     if log_t:
         plt.xscale("log", base=10)
 
@@ -320,25 +259,23 @@ def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
 def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int):
     """Plots the epidemic curve for the given infection times with the given parameters."""
     plt.figure(graph_no, figsize=(13,13), clear=True)
-    axes = plt.gca()
 
+    plt.grid(visible=True)
+
+    # y axis is always log, x axis may be log depending on params.
     plt.yscale("log", base=10)
-    axes.yaxis.set_major_formatter(FuncFormatter(exp_formatter))
     if params.log_t:
         plt.xscale("log", base=10)
-        axes.xaxis.set_major_formatter(FuncFormatter(exp_formatter))
 
-    plt.xlabel("t" if not params.log_t else "log(t)")
-    plt.ylabel("log(I(t))")
+    # Median as a bold line, with shaded error region between top and bottom curve.
     plt.plot(curve_data.median_curve, curve_data.i_points, linewidth=2)
     plt.plot(curve_data.top_curve, curve_data.i_points, linestyle="dashed", color="black", linewidth=.5)
     plt.plot(curve_data.bottom_curve, curve_data.i_points, linestyle="dashed", color="black", linewidth=.5)
     plt.fill_betweenx(curve_data.i_points, curve_data.top_curve, curve_data.bottom_curve, color="#B3C7F7")
-    plt.grid(visible=True)
 
+    # Plot insets if needed.
     if params.psi_inset_infection_range is not None:
         plot_psi_inset(curve_data=curve_data, infection_range=params.psi_inset_infection_range)
-
     if params.region_inset:
         plot_region_inset(curve_data=curve_data, log_t=params.log_t)
 
