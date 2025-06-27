@@ -184,8 +184,9 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     # Zoomed-in plot of linear regression overlaid on the true value.
     plt.xlim(time_coords[0], time_coords[-1])
     plt.ylim(infection_coords[0], infection_coords[-1])
-    plt.plot(time_coords, infection_coords, linewidth=6, color="gray", linestyle="dashed")
-    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="#D55E00")
+    plt.plot(time_coords, infection_coords, linewidth=6, color="#999999")
+    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="#D55E00",
+             linestyle="dashed")
 
     # Print the slope of the linear regression.
     plt.title(rf"$2\psi = {round(model.coef_[0], 2)}$")
