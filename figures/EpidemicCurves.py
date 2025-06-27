@@ -1,11 +1,14 @@
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 import functools
 from math import ceil, log2, log10
-from typing import List, Mapping, Sequence, Type
+from typing import List, Mapping, Optional, Sequence, Tuple, Type
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+from matplotlib.ticker import FuncFormatter
+from matplotlib.patches import ConnectionPatch
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
 import config
 from PresetGraph import PresetGraph
@@ -13,7 +16,6 @@ from Gowalla import SyntheticGowallaGraph, GowallaGiantGraph
 from Region import Region, region_from_position
 from SIEpidemic import SIEpidemic, FPPCostGen
 from SIExperiment import SIExperiment, ResultFunction, InitialVertexFunction, FixedInitialVertex
-
 
 
 RUN_COUNT = 55
@@ -87,16 +89,18 @@ class CurveParams:
 @dataclass
 class PlotParams:
     log_t: bool
-    xi_inset: bool
     region_inset: bool
+    psi_inset_infection_range: Optional[Tuple[int, int]]
 
 
 GOWALLA_INITIAL = 164
 GOWALLA_CUTOFF = 64635
+GOWALLA_XI_RANGE = (150, 5000)
 GOWALLA_PARAMS = {"graph": GowallaGiantGraph, "initial": FixedInitialVertex(name=GOWALLA_INITIAL),
                   "result_fn": InfectionTimesAndRegions(cutoff=GOWALLA_CUTOFF)}
 SYN_GOWALLA_CUTOFF = 166667
 SYN_GOWALLA_INITIAL = 230563
+SYN_GOWALLA_XI_RANGE = (150, SYN_GOWALLA_CUTOFF)
 SYN_GOWALLA_PARAMS = {"graph": SyntheticGowallaGraph, "initial": FixedInitialVertex(name=SYN_GOWALLA_INITIAL),
                       "result_fn": InfectionTimesAndRegions(cutoff=SYN_GOWALLA_CUTOFF)}
 CURVE_PARAMS: List[CurveParams] = [
@@ -111,14 +115,14 @@ CURVE_PARAMS: List[CurveParams] = [
 ]
 
 PLOT_PARAMS: List[PlotParams] = [
-    PlotParams(log_t=False, xi_inset=False, region_inset=True),
-    PlotParams(log_t=False, xi_inset=False, region_inset=True),
-    PlotParams(log_t=True, xi_inset=True, region_inset=True),
-    PlotParams(log_t=True, xi_inset=True, region_inset=True),
-    PlotParams(log_t=False, xi_inset=False, region_inset=False),
-    PlotParams(log_t=False, xi_inset=False, region_inset=False),
-    PlotParams(log_t=True, xi_inset=True, region_inset=False),
-    PlotParams(log_t=True, xi_inset=True, region_inset=False)
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
+    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
+    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
+    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False),
+    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False)
 ]
 
 SEEDS = [
@@ -206,16 +210,83 @@ def exp_formatter(y, _):
     exponent = int(np.round(log10(y)))
     return rf"$10^{{{exponent}}}$"
 
+def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, int]):
+    # Sets start_index to the first plotted infection count greater than infection_range[0]-1, i.e. the first plotted
+    # infection count which is at least infection_range[0].
+    start_index = bisect_right(curve_data.i_points, infection_range[0] - 1)
+    # Sets end_point to the first plotted infection count greater than infection_range[1]. This means the last point
+    # of the start_index:end_point slice will be the last plotted infection count which is at most infection_range[1].
+    end_index = bisect_left(curve_data.i_points, infection_range[1] + 1)
+    log_times = [log10(t) for t in curve_data.median_curve[start_index:end_index]]
+    log_infections = [log10(x) for x in curve_data.i_points[start_index:end_index]]
+
+    # Run the linear regression.
+    reshaped_log_times = [[t] for t in log_times]
+    model = LinearRegression()
+    model.fit(reshaped_log_times, log_infections)
+
+    # Points to plot in the inset.
+    time_coords = curve_data.median_curve[start_index:end_index]
+    infection_coords = curve_data.i_points[start_index:end_index]
+    regression_infection_coords = [model.intercept_ + model.coef_[0] * t for t in log_times]
+
+    # Pass to inset.
+    main_axes = plt.gca()
+    inset_axes = plt.axes((0.15, 0.47, 0.28, 0.43))
+    plt.sca(inset_axes)
+
+    plt.plot(time_coords, infection_coords, linewidth=6, color="gray", linestyle="dashed")
+    plt.plot(time_coords, [10**x for x in regression_infection_coords], linewidth=3, color="red")
+
+    # Bare axes with log/log scale.
+    plt.xscale("log", base=10)
+    plt.yscale("log", base=10)
+    plt.grid(visible=True)
+
+    inset_axes.tick_params(which="both", bottom=False, top=False, left=False, right=False, labelbottom=False,
+                           labelleft=False)
+
+    # Zoomed-in plot of linear regression overlaid on the true value.
+    plt.xlim(time_coords[0], time_coords[-1])
+    plt.ylim(infection_coords[0], infection_coords[-1])
+
+    # Print the slope of the linear regression.
+    plt.title(f"$2\\psi = {round(model.coef_[0], 2)}$")
+
+    # Indicate boundaries of inset plot with dotted grey lines. Set the coordinates first.
+    inset_right_edge_x = inset_axes.get_xlim()[1]
+    inset_bottom_edge_y = inset_axes.get_ylim()[0]
+    inset_top_edge_y = inset_axes.get_ylim()[1]
+    inset_bottom_right = (inset_right_edge_x, inset_bottom_edge_y)
+    inset_top_right = (inset_right_edge_x, inset_top_edge_y)
+    main_bottom_left = (time_coords[0], infection_coords[0])
+    main_top_right = (time_coords[-1], infection_coords[-1])
+
+    # Pass back to main figure before drawing the lines.
+    plt.sca(main_axes)
+
+    bottom_patch = ConnectionPatch(xyA=main_bottom_left, coordsA=main_axes.transData, xyB=inset_bottom_right,
+                                   coordsB=inset_axes.transData, color="grey", linewidth=2, linestyle="dotted")
+    plt.gcf().add_artist(bottom_patch)
+    top_patch = ConnectionPatch(xyA=main_top_right, coordsA=main_axes.transData, xyB=inset_top_right,
+                                coordsB=inset_axes.transData, color="grey", linewidth=2, linestyle="dotted")
+    plt.gcf().add_artist(top_patch)
+
+
+def plot_region_inset(curve_data: EpidemicCurveData):
+    pass
+
+
 def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int):
     """Plots the epidemic curve for the given infection times with the given parameters."""
     plt.figure(graph_no, figsize=(13,13), clear=True)
     axes = plt.gca()
 
     plt.yscale("log", base=10)
-    axes.yaxis.set_major_formatter(ticker.FuncFormatter(exp_formatter))
+    axes.yaxis.set_major_formatter(FuncFormatter(exp_formatter))
     if params.log_t:
         plt.xscale("log", base=10)
-        axes.xaxis.set_major_formatter(ticker.FuncFormatter(exp_formatter))
+        axes.xaxis.set_major_formatter(FuncFormatter(exp_formatter))
 
     plt.xlabel("t" if not params.log_t else "log(t)")
     plt.ylabel("log(I(t))")
@@ -224,6 +295,12 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
     plt.plot(curve_data.bottom_curve, curve_data.i_points, linestyle="dashed", color="black", linewidth=.5)
     plt.fill_betweenx(curve_data.i_points, curve_data.top_curve, curve_data.bottom_curve, color="#B3C7F7")
     plt.grid(visible=True)
+
+    if params.psi_inset_infection_range is not None:
+        plot_psi_inset(curve_data=curve_data, infection_range=params.psi_inset_infection_range)
+
+    if params.region_inset:
+        plot_region_inset(curve_data)
 
     plt.savefig(config.FIGURE_FOLDER / f"epidemic_curves_{graph_no}.png")
 
