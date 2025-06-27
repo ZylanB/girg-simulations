@@ -195,20 +195,26 @@ def process_infection_times(runs: List[RunDatum], bottom: int, top: int) -> Epid
     median_curve = [float(np.percentile(infections, 50, method="nearest")) for infections in zipped_times]
     top_curve = [float(np.percentile(infections, top, method="nearest")) for infections in zipped_times]
 
-    region_medians = {r: [] for r in Region}
-    for x in range(len(i_points)):
-        median_run = [run for run in runs if run.infection_times[x] == median_curve[x]][0]
-        for r in Region:
-            region_medians[r].append(median_run.region_counts[r][x])
+    l2_from_median = lambda r: sum([(r.infection_times[x] - median_curve[x]) ** 2 for x in range(len(i_points))])
+    medoid_run = min(runs, key=l2_from_median)
+
+    # region_medians = {r: [] for r in Region}
+    # for x in range(len(i_points)):
+    #     median_run = [run for run in runs if run.infection_times[x] == median_curve[x]][0]
+    #     for r in Region:
+    #         region_medians[r].append(median_run.region_counts[r][x])
 
     return EpidemicCurveData(i_points=i_points, bottom_curve=bottom_curve, median_curve=median_curve,
-                             top_curve=top_curve, region_medians=region_medians)
+                             top_curve=top_curve, region_medians=medoid_run.region_counts)
 
 def exp_formatter(y, _):
     if y <= 0:
         return str(y)
-    exponent = int(np.round(log10(y)))
+    exponent = int(round(log10(y)))
     return rf"$10^{{{exponent}}}$"
+
+def percent_formatter(y, _):
+    return f"{int(round(y,0))}%"
 
 def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, int]):
     # Sets start_index to the first plotted infection count greater than infection_range[0]-1, i.e. the first plotted
@@ -251,7 +257,7 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     plt.ylim(infection_coords[0], infection_coords[-1])
 
     # Print the slope of the linear regression.
-    plt.title(f"$2\\psi = {round(model.coef_[0], 2)}$")
+    plt.title(rf"$2\psi = {round(model.coef_[0], 2)}$")
 
     # Indicate boundaries of inset plot with dotted grey lines. Set the coordinates first.
     inset_right_edge_x = inset_axes.get_xlim()[1]
@@ -273,8 +279,42 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     plt.gcf().add_artist(top_patch)
 
 
-def plot_region_inset(curve_data: EpidemicCurveData):
-    pass
+def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
+    # Pass to inset.
+    main_axes = plt.gca()
+    inset_axes = plt.axes((0.625, 0.15, 0.25, 0.25))
+    plt.sca(inset_axes)
+
+    # At each infection count, get the breakdown into proportions in the EU/US/other regions.
+    point_count = len(curve_data.i_points)
+    region_medians = curve_data.region_medians
+    total_infections = curve_data.i_points
+    eu_proportions = [100 * region_medians[Region.EU][x] / total_infections[x] for x in range(point_count)]
+    us_proportions = [100 * region_medians[Region.US][x] / total_infections[x] for x in range(point_count)]
+    other_proportions = [100 * region_medians[Region.OTHER][x] / total_infections[x] for x in range(point_count)]
+
+    # Get the actual boundaries between regions of the plot.
+    eu_cumulative = eu_proportions
+    us_cumulative = [eu_proportions[x] + us_proportions[x] for x in range(point_count)]
+    other_cumulative = [us_cumulative[x] + other_proportions[x] for x in range(point_count)]
+
+    median_curve = curve_data.median_curve
+
+    plt.grid(visible=True)
+    inset_axes.margins(x=0)
+    inset_axes.set_yticks([0, 25, 50, 75, 100])
+    plt.ylim(0, 100)
+    inset_axes.yaxis.set_major_formatter(FuncFormatter(percent_formatter))
+    if log_t:
+        plt.xscale("log", base=10)
+
+    # Colours from Okabe-Ito palette, should be safe for colour-blind viewers/monochrome printers
+    plt.fill_between(median_curve, [0]*point_count, eu_cumulative, color="#0072B2")
+    plt.fill_between(median_curve, eu_cumulative, us_cumulative, color="#D55E00")
+    plt.fill_between(median_curve, us_cumulative, other_cumulative, color="#999999")
+
+    # Pass back to main plot before returning.
+    plt.sca(main_axes)
 
 
 def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int):
@@ -300,7 +340,7 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
         plot_psi_inset(curve_data=curve_data, infection_range=params.psi_inset_infection_range)
 
     if params.region_inset:
-        plot_region_inset(curve_data)
+        plot_region_inset(curve_data=curve_data, log_t=params.log_t)
 
     plt.savefig(config.FIGURE_FOLDER / f"epidemic_curves_{graph_no}.png")
 

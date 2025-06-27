@@ -76,10 +76,8 @@ class TestDataProcessing(unittest.TestCase):
         self.assertEqual(curves.top_curve, [0., 3., 10., 15., 21., 27.])
 
         # The median run is run_a at 1 infection (as the first run in the list with the median value), run_c at 4
-        # infections, and run_b at all other i_points.
-        self.assertEqual(curves.region_medians[Region.US], [1, 1, 1, 3, 3, 4])
-        self.assertEqual(curves.region_medians[Region.EU], [0, 1, 1, 1, 3, 4])
-        self.assertEqual(curves.region_medians[Region.OTHER], [0, 0, 2, 2, 2, 2])
+        # infections, and run_b at all other i_points. The medoid, which is what we should be getting, is always run_b.
+        self.assertEqual(curves.region_medians, run_b.region_counts)
 
 
 if __name__ == '__main__':
