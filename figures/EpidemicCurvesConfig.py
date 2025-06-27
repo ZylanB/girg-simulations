@@ -40,6 +40,7 @@ class PlotParams:
 
 RUN_COUNT = 55      # Number of infections to simulate per graph.
 PLOT_PRECISION = 4  # Increase to plot more points per graph.
+FILENAME_BASE = "epidemic-curve-"  # Start of plot filenames
 
 
 GOWALLA_INITIAL = 164
