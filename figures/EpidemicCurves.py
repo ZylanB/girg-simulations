@@ -305,7 +305,7 @@ def collate_curves():
     canvas.save(config.FIGURE_FOLDER / f"{FILENAME_BASE}combined.png")
 
 
-if __name__ == '__main__':
+def generate_figures():
     if len(CURVE_PARAMS) != len(SEEDS) or len(CURVE_PARAMS) != len(PLOT_PARAMS):
         raise RuntimeError("Mismatched plot parameters!")
 
@@ -321,3 +321,7 @@ if __name__ == '__main__':
 
     print("Combining plots...")
     collate_curves()
+
+
+if __name__ == '__main__':
+    generate_figures()
