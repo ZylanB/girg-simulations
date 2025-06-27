@@ -185,7 +185,7 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     plt.xlim(time_coords[0], time_coords[-1])
     plt.ylim(infection_coords[0], infection_coords[-1])
     plt.plot(time_coords, infection_coords, linewidth=6, color="gray", linestyle="dashed")
-    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="red")
+    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="#D55E00")
 
     # Print the slope of the linear regression.
     plt.title(rf"$2\psi = {round(model.coef_[0], 2)}$")
@@ -202,10 +202,10 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     # Pass back to main figure before drawing the lines.
     plt.sca(main_axes)
     bottom_patch = ConnectionPatch(xyA=main_bottom_left, coordsA=main_axes.transData, xyB=inset_bottom_right,
-                                   coordsB=inset_axes.transData, color="grey", linewidth=2, linestyle="dotted")
+                                   coordsB=inset_axes.transData, color="#999999", linewidth=2, linestyle="dotted")
     plt.gcf().add_artist(bottom_patch)
     top_patch = ConnectionPatch(xyA=main_top_right, coordsA=main_axes.transData, xyB=inset_top_right,
-                                coordsB=inset_axes.transData, color="grey", linewidth=2, linestyle="dotted")
+                                coordsB=inset_axes.transData, color="#999999", linewidth=2, linestyle="dotted")
     plt.gcf().add_artist(top_patch)
 
 
