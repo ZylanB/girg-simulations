@@ -125,8 +125,9 @@ def plot_inset():
     plt.yscale("log", base=10)
     plt.xlim(1, 10**4)
     plt.ylim(.01, 1)
-    plt.step(edge_ccdf_x, edge_ccdf_y, linewidth=5, color=colours.GREY)
-    plt.plot(edge_regression_x, edge_regression_y, linewidth=3, color=colours.RED, linestyle="dashed")
+    plt.step(edge_ccdf_x, edge_ccdf_y, linewidth=3, color=colours.BLUE)
+    plt.plot(edge_regression_x, edge_regression_y, linewidth=6, color=colours.RED, linestyle="dashed",
+             dash_capstyle="round")
 
     plt.figtext(0.1875, 0.1375, rf"$d(1-\alpha)={np.round(2*(1-alpha), 3)},\quad\alpha={np.round(alpha, 3)}$")
 
@@ -150,7 +151,7 @@ def generate_figure():
     axes = plt.gca()
     axes.set_xscale("log")
     axes.set_yscale("log")
-    axes.step(x_ccdf, y_ccdf, linewidth=6, color=colours.GREY)
+    axes.step(x_ccdf, y_ccdf, linewidth=6, color=colours.BLUE)
 
     x = x_ccdf[np.where(x_ccdf >= xmin)]
     # This should just be the unique CCDF value at xmin from how get_ccdf is defined.
@@ -159,7 +160,7 @@ def generate_figure():
     # The log of estimator_y (what we want to plot) is a line down from (log xmin, log ymin) with slope -xi.
     # So log(estimator_y) = log(y_0) - xi(log(x) - log(x_0)). So estimator_y = y_0(x_0/x)^xi.
     estimator_y = [ymin * (float(xmin) / k) ** ccdf_exp for k in x]
-    axes.plot(x, estimator_y, color=colours.RED, linewidth=3, linestyle="dashed")
+    axes.plot(x, estimator_y, color=colours.RED, linewidth=3, linestyle="dashed", dash_capstyle="round")
     axes.plot((x[-1]), estimator_y[-1], linestyle="none", marker="o", markerfacecolor="none",
               markeredgecolor=colours.RED, markeredgewidth=3, markersize=20)
 
