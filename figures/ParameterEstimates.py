@@ -12,11 +12,12 @@ import figures.colours as colours
 import config
 from Gowalla import GowallaGraph
 
+
 SEED = 7272300  # Obtained from np.random.SeedSequence().entropy & (2**32 - 1).
-ALPHA_MAX_DEGREE = 148
-ALPHA_MIN_EDGE_LENGTH = 1
+ALPHA_MAX_DEGREE = 148  # Edge lengths will be taken only from the induced subgraph of nodes with this max degree.
+ALPHA_MIN_EDGE_LENGTH = 1  # After calculating the CCDF, we discard edge lengths below MIN/above MAX as outliers.
 ALPHA_MAX_EDGE_LENGTH = 1000
-ALPHA_INSET_CUTOFF = 100
+
 
 def get_degree_sequence(graph_data: GraphData) -> np.ndarray:
     """Returns the degree sequence of the Gowalla graph in decreasing order."""
@@ -37,6 +38,8 @@ class HillData:
 
 
 def get_hill_coefficients(data: np.ndarray) -> HillData:
+    """Returns Hill's estimator for the power-law of the given dataset, which should be sorted in decreasing order.
+    Also returns the value of tau corresponding to this estimator if the dataset is a graph's degree sequence."""
     np.random.seed(SEED)  # tail_estimates uses RandomState rather than a Generator, so we seed it this way.
 
     # Adds independent uniform noise on [-0.5, 0.5] to each data point. Necessary according to Voitalov et al.
@@ -52,11 +55,11 @@ def get_hill_coefficients(data: np.ndarray) -> HillData:
 
 @dataclass
 class InsetData:
-    edge_ccdf_x: np.ndarray
-    edge_ccdf_y: np.ndarray
-    edge_regression_x: np.ndarray
-    edge_regression_y: np.ndarray
-    alpha: float
+    edge_ccdf_x: np.ndarray  # x coordinates for the CCDF of the edge lengths.
+    edge_ccdf_y: np.ndarray  # y coordinates for the CCDF of the edge lengths.
+    edge_regression_x: np.ndarray  # x coordinates for the linear regression on log(edge_ccdf) (a subset of edge_ccdf_x).
+    edge_regression_y: np.ndarray  # y coordinates for the linear regression on log(edge_ccdf).
+    alpha: float  # Value of alpha corresponding to the slope of the linear regression on log(edge_ccdf).
 
 
 def get_low_degree_edges(size: int, edge_list: Sequence[Tuple[int, int]], cutoff: int) -> np.ndarray:
@@ -71,7 +74,9 @@ def get_low_degree_edges(size: int, edge_list: Sequence[Tuple[int, int]], cutoff
     return low_degree_graph.get_edges()
 
 
-def get_inset_data(graph_data: GraphData) -> InsetData:
+def alpha_estimate_data(graph_data: GraphData) -> InsetData:
+    """Uses a linear regression on log(edge lengths) to estimate an alpha parameter for a synthetic GIRG version of
+    the given graph."""
     vertex_set, edge_list = graph_data.vertex_set, graph_data.edge_list
 
     low_degree_edges = get_low_degree_edges(size=vertex_set.size, edge_list=edge_list, cutoff=ALPHA_MAX_DEGREE)
@@ -108,7 +113,7 @@ def get_inset_data(graph_data: GraphData) -> InsetData:
 
 def plot_inset(graph_data: GraphData):
     # Get data to plot
-    inset_data = get_inset_data(graph_data)
+    inset_data = alpha_estimate_data(graph_data)
     edge_ccdf_x, edge_ccdf_y = inset_data.edge_ccdf_x, inset_data.edge_ccdf_y
     edge_regression_x, edge_regression_y = inset_data.edge_regression_x, inset_data.edge_regression_y
     alpha = inset_data.alpha
