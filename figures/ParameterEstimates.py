@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Sequence, Tuple
 
+from PresetGraph import GraphData
 from figures.tail_estimation import add_uniform_noise, get_ccdf, hill_estimator
 import graph_tool.all as gt
 import matplotlib.pyplot as plt
@@ -17,9 +18,8 @@ ALPHA_MIN_EDGE_LENGTH = 1
 ALPHA_MAX_EDGE_LENGTH = 1000
 ALPHA_INSET_CUTOFF = 100
 
-def get_degree_sequence() -> np.ndarray:
+def get_degree_sequence(graph_data: GraphData) -> np.ndarray:
     """Returns the degree sequence of the Gowalla graph in decreasing order."""
-    graph_data = GowallaGraph().graph_data
     graph = gt.Graph(directed=False)
     graph.add_vertex(n=graph_data.vertex_set.size)
     graph.add_edge_list(graph_data.edge_list)
@@ -71,8 +71,7 @@ def get_low_degree_edges(size: int, edge_list: Sequence[Tuple[int, int]], cutoff
     return low_degree_graph.get_edges()
 
 
-def get_inset_data() -> InsetData:
-    graph_data = GowallaGraph().graph_data
+def get_inset_data(graph_data: GraphData) -> InsetData:
     vertex_set, edge_list = graph_data.vertex_set, graph_data.edge_list
 
     low_degree_edges = get_low_degree_edges(size=vertex_set.size, edge_list=edge_list, cutoff=ALPHA_MAX_DEGREE)
@@ -107,9 +106,9 @@ def get_inset_data() -> InsetData:
                      edge_regression_y=edge_regression_y, alpha=alpha)
 
 
-def plot_inset():
+def plot_inset(graph_data: GraphData):
     # Get data to plot
-    inset_data = get_inset_data()
+    inset_data = get_inset_data(graph_data)
     edge_ccdf_x, edge_ccdf_y = inset_data.edge_ccdf_x, inset_data.edge_ccdf_y
     edge_regression_x, edge_regression_y = inset_data.edge_regression_x, inset_data.edge_regression_y
     alpha = inset_data.alpha
@@ -136,7 +135,9 @@ def plot_inset():
 
 
 def generate_figure():
-    degrees = get_degree_sequence()
+    graph_data = GowallaGraph().graph_data
+
+    degrees = get_degree_sequence(graph_data)
     hill_coefficients = get_hill_coefficients(degrees)
     xi, kappa, tau = hill_coefficients.xi, hill_coefficients.kappa, hill_coefficients.tau
 
@@ -167,7 +168,7 @@ def generate_figure():
     plt.figtext(0.6, 0.8, rf"$\xi_{{\kappa, n}} = {round(xi, 3)}$" + '\n' +
                 rf"$\tau = 1 + 1/\xi_{{\kappa, n}} = {round(tau, 3)}$", )
 
-    plot_inset()
+    plot_inset(graph_data)
 
     plt.savefig(config.FIGURE_FOLDER / "gowalla-tail-estimates.png")
 
