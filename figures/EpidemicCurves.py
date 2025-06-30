@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 from sklearn.linear_model import LinearRegression
 
+import figures.colours as colours
 import config
 from Region import Region, region_from_position
 from SIEpidemic import FPPCostGen, SIEpidemic
@@ -184,8 +185,8 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     # Zoomed-in plot of linear regression overlaid on the true value.
     plt.xlim(time_coords[0], time_coords[-1])
     plt.ylim(infection_coords[0], infection_coords[-1])
-    plt.plot(time_coords, infection_coords, linewidth=6, color="#999999")
-    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color="#D55E00",
+    plt.plot(time_coords, infection_coords, linewidth=6, color=colours.GREY)
+    plt.plot(time_coords, [10 ** x for x in regression_infection_coords], linewidth=3, color=colours.RED,
              linestyle="dashed")
 
     # Print the slope of the linear regression.
@@ -203,10 +204,10 @@ def plot_psi_inset(curve_data: EpidemicCurveData, infection_range: Tuple[int, in
     # Pass back to main figure before drawing the lines.
     plt.sca(main_axes)
     bottom_patch = ConnectionPatch(xyA=main_bottom_left, coordsA=main_axes.transData, xyB=inset_bottom_right,
-                                   coordsB=inset_axes.transData, color="#999999", linewidth=2, linestyle="dotted")
+                                   coordsB=inset_axes.transData, color=colours.GREY, linewidth=2, linestyle="dotted")
     plt.gcf().add_artist(bottom_patch)
     top_patch = ConnectionPatch(xyA=main_top_right, coordsA=main_axes.transData, xyB=inset_top_right,
-                                coordsB=inset_axes.transData, color="#999999", linewidth=2, linestyle="dotted")
+                                coordsB=inset_axes.transData, color=colours.GREY, linewidth=2, linestyle="dotted")
     plt.gcf().add_artist(top_patch)
 
 
@@ -250,9 +251,9 @@ def plot_region_inset(curve_data: EpidemicCurveData, log_t: bool):
         plt.xscale("log", base=10)
 
     # Colours from Okabe-Ito palette, should be safe for colour-blind viewers/monochrome printers
-    plt.fill_between(median_curve, [0]*point_count, eu_cumulative, color="#0072B2")
-    plt.fill_between(median_curve, eu_cumulative, us_cumulative, color="#D55E00")
-    plt.fill_between(median_curve, us_cumulative, other_cumulative, color="#999999")
+    plt.fill_between(median_curve, [0]*point_count, eu_cumulative, color=colours.BLUE)
+    plt.fill_between(median_curve, eu_cumulative, us_cumulative, color=colours.RED)
+    plt.fill_between(median_curve, us_cumulative, other_cumulative, color=colours.GREY)
 
     # Pass back to main plot before returning.
     plt.sca(main_axes)
@@ -271,9 +272,9 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
 
     # Median as a bold line, with shaded error region between top and bottom curve.
     plt.plot(curve_data.median_curve, curve_data.i_points, linewidth=2)
-    plt.plot(curve_data.top_curve, curve_data.i_points, linestyle="dashed", color="black", linewidth=.5)
-    plt.plot(curve_data.bottom_curve, curve_data.i_points, linestyle="dashed", color="black", linewidth=.5)
-    plt.fill_betweenx(curve_data.i_points, curve_data.top_curve, curve_data.bottom_curve, color="#B3C7F7")
+    plt.plot(curve_data.top_curve, curve_data.i_points, linestyle="dashed", color=colours.BLACK, linewidth=.5)
+    plt.plot(curve_data.bottom_curve, curve_data.i_points, linestyle="dashed", color=colours.BLACK, linewidth=.5)
+    plt.fill_betweenx(curve_data.i_points, curve_data.top_curve, curve_data.bottom_curve, color=colours.LIGHT_BLUE)
 
     # Plot insets if needed.
     if params.psi_inset_infection_range is not None:
