@@ -163,7 +163,7 @@ class EarthDistance(Metric):
     """Returns the distance in kilometres between x and y on the surface of Earth, where x and y are given in
         (latitude, longitude) format. Uses the Haversine formula (so it assumes the earth is a sphere)."""
     def __init__(self):
-        self._function = lambda x, y: haversine.haversine(x, y)
+        self._function = lambda x, y: haversine.haversine(x, y, unit=haversine.Unit.KILOMETERS)
 
 
 class VertexSetGen(LoggableFunction[[np.random.Generator], VertexSet]):
