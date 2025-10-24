@@ -44,7 +44,7 @@ class GenericResultFunction(ResultFunction):
 
 
 class SIExperiment:
-    """
+    r"""
     Class to run and log an experiment with multiple iterations of an SI epidemic. Note that optional arguments are
     only optional in order to allow loading them from a file.
 
