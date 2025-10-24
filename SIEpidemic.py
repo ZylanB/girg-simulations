@@ -89,6 +89,7 @@ class SIEpidemic:
 
         # Start with the numpy arrays of edge sources/destinations/IDs to avoid costly lookups.
         edge_array = self.graph.get_edges([self.graph.edge_index])
+        edge_array = edge_array[edge_array[:, 2].argsort()]
         u_array, v_array, _ = edge_array.T
 
         # Pull these into local variables to avoid recomputing them.
@@ -104,6 +105,7 @@ class SIEpidemic:
         # Directly reassign the edge property's array to this new array rather than going edge-by-edge.
         del self.edge_costs
         self.edge_costs = self.graph.new_edge_property("double", vals=new_costs)
+        self.graph.edge_properties["edge_costs"] = self.edge_costs
 
         # The next step in optimisation here would be to vectorise penalty and cost_gen. Vectorising cost_gen would be
         # easy, but only cut running times by 10-15% or so. Vectorising penalty would be more significant but would
