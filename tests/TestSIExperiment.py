@@ -133,27 +133,38 @@ class FileIOTests(unittest.TestCase):
         self.assertEqual(experiment.results, [6, 0, 1, 2, 3, 4, 5])
 
     def test_no_resample_costs(self):
+        """
+        We should get:
+        Edge    L-value     Penalty     Cost
+        0,1     0           0           0
+        0,2     1           0           0
+        1,2     2           .125        .25
+        0,3     3           0           0
+        1,3     4           .375        1.5
+        2,3     5           .375        1.875
+        For a total cost of 3.625 every iteration.
+        """
         experiment = SIExperiment(**self.experiment_args, result_fn=self.total_cost)
         experiment.execute()
-        self.assertEqual(experiment.results, [3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75])
+        self.assertEqual(experiment.results, [3.625, 3.625, 3.625, 3.625, 3.625, 3.625, 3.625])
 
     def test_resample_costs(self):
         self.experiment_args['resample_costs'] = True
         experiment = SIExperiment(**self.experiment_args, result_fn=self.total_cost)
         experiment.execute()
-        self.assertEqual(experiment.results, [.125*(6*i+3) + .375*(6*i+4) + .375*(6*i+5) for i in range(7)])
+        self.assertEqual(experiment.results, [.125*(6*i+2) + .375*(6*i+4) + .375*(6*i+5) for i in range(7)])
 
     def test_resampling_edges_resamples_costs(self):
         self.experiment_args['resample_edges'] = True
         experiment = SIExperiment(**self.experiment_args, result_fn=self.total_cost)
         experiment.execute()
-        self.assertEqual(experiment.results, [3.75, 0., 0., 0., .125*11, .125*15, .125*19+.375*20])
+        self.assertEqual(experiment.results, [3.625, 0., 0., 0., .125*11, .125*14, .125*18+.375*20])
 
     def test_resampling_vertices_resamples_costs(self):
         self.experiment_args['resample_vertices'] = True
         experiment = SIExperiment(**self.experiment_args, result_fn=self.total_cost)
         experiment.execute()
-        self.assertEqual(experiment.results, [3.75, 0, 27.0, 236.25, 723.375, 2670.625, 6572.375])
+        self.assertEqual(experiment.results, [3.625, 0., 27.0, 236.25, 723.375, 2728.0, 6653.25])
 
     def test_no_resample_weights(self):
         experiment = SIExperiment(**self.experiment_args, result_fn=self.sum_weights)
