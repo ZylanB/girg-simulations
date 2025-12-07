@@ -18,7 +18,7 @@ TEST_DIR = config.TEST_FOLDER
 
 def _test_weight_gen(vertices, _):
     _test_weight_gen.x += 1
-    return [_test_weight_gen.x + .25 * i for i in range(vertices.size)]
+    return [_test_weight_gen.x + .25 * i for i in range(vertices.count)]
 
 
 _test_weight_gen.x = -1  # type: ignore
@@ -83,7 +83,7 @@ class FileIOTests(unittest.TestCase):
         self.initial_vertex_fn = FixedInitialVertex(0)
         self.edge_count = GenericResultFunction(lambda epi, _: epi.graph.num_edges(), "Edge count")
         self.sum_weights = GenericResultFunction(lambda epi, _: sum(epi.vertex_set.weights), description="Total weight")
-        self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.size, description="Vertex count")
+        self.vertex_count = GenericResultFunction(lambda epi, _: epi.vertex_set.count, description="Vertex count")
         self.total_cost = GenericResultFunction(lambda epi, _: sum([epi.edge_costs[e] for e in epi.graph.edges()]),
                                                 description="Total edge cost")
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import gzip
 from pathlib import Path
 import shutil
-from typing import List, Optional, Sequence, Tuple, Type
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Type
 
 import dill  # type: ignore
 import graph_tool.all as gt  # type: ignore
@@ -15,14 +15,15 @@ import requests
 
 import config
 from PresetGraph import extract_giant_data, GraphData, PresetGraph, PresetGen
+from Region import Region, region_from_position
 from SIEpidemic import GirgGen
 from VertexSet import EarthDistance, VertexSet, PoissonPointProcess
 from WeightedVertexSet import PowerLawWeightGen, IdentityWeightScaler, WeightedVertexSet
 
 # Parameter values for synthetic GIRGs to mimic Gowalla.
-SYN_GOWALLA_ALPHA = 1.17
-SYN_GOWALLA_TAU = 2.8
-SYN_GOWALLA_SIZE = 500
+SYN_GOWALLA_ALPHA = 1.2
+SYN_GOWALLA_TAU = 2.78
+SYN_GOWALLA_SIZE = 1000
 
 
 def obtain_data_file(url: str, dest_path: Path):
@@ -86,6 +87,10 @@ class TieDatum:
 
 
 class GowallaGraph(PresetGraph):
+    def __init__(self, regions: Collection[Region], seed_override: Optional[int] = None,
+                 base_folder: Path = config.DATA_FOLDER):
+        super().__init__(seed_override=seed_override, base_folder=base_folder, generator_args={"regions": regions})
+
     @property
     def description(self) -> str:
         return "Preset graph generated from the Gowalla dataset with the GowallaGen class."
@@ -108,15 +113,18 @@ class GowallaGen(PresetGen):
     _VERTEX_DATA_PATH = config.DATA_FOLDER / "gowalla_data" / "Gowalla_totalCheckins.txt"
     _EDGE_DATA_PATH = config.DATA_FOLDER / "gowalla_data" / "Gowalla_edges.txt"
 
-    def __init__(self, rng: np.random.Generator, base_folder: Path):
+    def __init__(self, rng: np.random.Generator, base_folder: Path,
+                 regions: Collection[Region]):
         if not self._snap_data_present():
             self._obtain_snap_data()
         self.ties: List[TieDatum] = []
+        self.regions = regions
         super().__init__(rng=rng, base_folder=base_folder)
 
     @property
     def name(self) -> str:
-        return "gowalla_data"
+        region_names = sorted([r.name for r in self.regions])
+        return f"gowalla_data_{"_".join(region_names)}"
 
     @classmethod
     def _obtain_snap_data(cls):
@@ -156,9 +164,10 @@ class GowallaGen(PresetGen):
         user_id_to_position = {}
         for id_, check_in_list in user_id_dict.items():
             position, tie_datum = self._get_user_position(check_in_list)
-            user_id_to_position[id_] = position
-            if tie_datum is not None:
-                self.ties.append(tie_datum)
+            if region_from_position(position) in self.regions:
+                user_id_to_position[id_] = position
+                if tie_datum is not None:
+                    self.ties.append(tie_datum)
 
         print("Generating vertex set...")
         vertex_set = VertexSet(dimension=2, metric=EarthDistance())
@@ -183,7 +192,7 @@ class GowallaGen(PresetGen):
                 degree_dict[user_id_0] += 1
 
         print("Generating weights...")
-        weights = [float(degree_dict[vertices.id_to_name(i)]) for i in range(vertices.size)]
+        weights = [float(degree_dict[vertices.id_to_name(i)]) for i in range(vertices.count)]
         return weights
 
     def _get_user_position(self, check_in_list: Sequence[CheckIn]) -> Tuple[Tuple[float, float], Optional[TieDatum]]:
@@ -260,6 +269,7 @@ class SyntheticGowallaGraph(PresetGraph):
     @property
     def default_seed(self) -> int:
         return 276482048599935051615627698249100747258
+        # return 85795583046476724170868074658693882175
 
     @property
     def description(self) -> str:
@@ -289,7 +299,30 @@ class SyntheticGowallaGen(PresetGen):
         self.vertices, self.weights, self.edge_list = giant_data.vertex_set, giant_data.weights, giant_data.edge_list
 
 
+class GowallaEUGiantGraph(PresetGraph):
+    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
+        super().__init__(seed_override=seed_override, base_folder=base_folder,
+                         generator_args={"regions": {Region.EU}, "name": "gowalla-giant-eu"})
+
+    @property
+    def default_seed(self) -> int:
+        return 243696392762333123792045834049537897896
+
+    @property
+    def description(self) -> str:
+        return ("Preset graph generated from the Gowalla dataset with GowallaGiantGen, restricted to the giant "
+                "component of the EU subgraph.")
+
+    @property
+    def graph_generator_class(self) -> Type[PresetGen]:
+        return GowallaGiantGen
+
+
 class GowallaGiantGraph(PresetGraph):
+    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
+        super().__init__(seed_override=seed_override, base_folder=base_folder,
+                         generator_args={"regions": {Region.EU, Region.US, Region.OTHER}, "name": "gowalla-giant-all"})
+
     @property
     def default_seed(self) -> int:
         return 243696392762333123792045834049537897896
@@ -304,12 +337,18 @@ class GowallaGiantGraph(PresetGraph):
 
 
 class GowallaGiantGen(PresetGen):
+    def __init__(self, rng: np.random.Generator, base_folder: Path,
+                 regions: Collection[Region], name: str):
+        self.regions = regions
+        self.name_value = name
+        super().__init__(rng=rng, base_folder=base_folder)
+
     @property
     def name(self):
-        return "gowalla-giant"
+        return self.name_value
 
     def create_data(self) -> None:
-        original_gowalla = GowallaGraph()
+        original_gowalla = GowallaGraph(regions=self.regions)
         giant_data = extract_giant_data(original_gowalla.graph_data)
         self.vertices, self.weights, self.edge_list = giant_data.vertex_set, giant_data.weights, giant_data.edge_list
 

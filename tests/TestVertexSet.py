@@ -21,7 +21,7 @@ class TestVertexSet(unittest.TestCase):
 
         self.assertEqual(set(self.test_instance.positions), {(1., 1.), (2., 2.), (3., 3.)})
         self.assertEqual(set(self.test_instance.names), {57, "Frog", 11.5})
-        self.assertEqual(self.test_instance.size, 3)
+        self.assertEqual(self.test_instance.count, 3)
 
         id_57 = self.test_instance.name_to_id(57)
         id_frog = self.test_instance.name_to_id("Frog")

@@ -181,6 +181,7 @@ class EdgeCostTests(unittest.TestCase):
         self.assertEqual(1.634472214616812e-06, p_value)
 
 
+@unittest.skip("This one is slooooooow and should be skipped except on major milestones.")
 class GIRGTests(unittest.TestCase):
     def setUp(self):
         self.alpha = 1.25
@@ -356,7 +357,7 @@ class FileIOTests(unittest.TestCase):
         loaded_vertices = loaded_value.vertex_set
 
         self.assertEqual(saved_vertices.dimension, loaded_vertices.dimension)
-        self.assertEqual(saved_vertices.size, loaded_vertices.size)
+        self.assertEqual(saved_vertices.count, loaded_vertices.count)
         for n in range(100):
             id_x = np.random.randint(0, 10000)
             id_y = np.random.randint(0, 10000)

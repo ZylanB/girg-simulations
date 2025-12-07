@@ -98,7 +98,7 @@ class VertexSet:
         return self._vertex_id_dict.values()
 
     @property
-    def size(self) -> int:
+    def count(self) -> int:
         """Returns the total number of vertices in the vertex set."""
         return len(self._vertex_id_dict)
 

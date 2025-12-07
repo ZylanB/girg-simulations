@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence, Tuple, Type, TypedDict
+from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypedDict
 
 import dill  # type: ignore
 import graph_tool.all as gt  # type: ignore
@@ -43,7 +43,7 @@ def extract_giant_data(data: GraphData) -> GraphData:
     deterministically. Pulled out of the SIEpidemic class for efficiency/neatness."""
     print("Loading graph...")
     graph = gt.Graph(directed=False)
-    graph.add_vertex(n=data.vertex_set.size)
+    graph.add_vertex(n=data.vertex_set.count)
     graph.add_edge_list(data.edge_list)
 
     print("Finding giant component...")
@@ -54,25 +54,23 @@ def extract_giant_data(data: GraphData) -> GraphData:
     name_to_pos_dict = {data.vertex_set.id_to_name(i): data.vertex_set.id_to_position(i) for i in induced_vertex_ids}
     giant_vertex_set = VertexSet(dimension=2, metric=data.vertex_set.metric)
     giant_vertex_set.set_points_from_names(name_to_pos_dict)
-
     old_to_new_ids = {induced_vertex_ids[i]: i for i in range(len(induced_vertex_ids))}
-    giant_weights = [0.] * giant_vertex_set.size
+    giant_weights = [0.] * giant_vertex_set.count
     for i in induced_vertex_ids:
         giant_weights[old_to_new_ids[i]] = data.weights[i]
-
-    giant_edge_list = list(giant.edges())
-    giant_edge_list = [(old_to_new_ids[i], old_to_new_ids[j]) for (i, j) in giant_edge_list]
-
+    giant_edge_list = [(old_to_new_ids[e.source()], old_to_new_ids[e.target()]) for e in giant.edges()]
     return GraphData(vertex_set=giant_vertex_set, weights=giant_weights, edge_list=giant_edge_list)
 
 
 class PresetGraph:
     """This class is intended for the common use case of generating a single graph that gets re-used for many
     experiments, e.g. from the Gowalla dataset."""
-    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER):
+    def __init__(self, seed_override: Optional[int] = None, base_folder: Path = config.DATA_FOLDER,
+                 generator_args: Optional[Dict[str, Any]] = None):
         seed = seed_override if seed_override is not None else self.default_seed
         self.rng = np.random.default_rng(seed)
         self.base_folder = base_folder
+        self.generator_args = generator_args if generator_args is not None else {}
 
     @property
     def default_seed(self) -> int:
@@ -95,7 +93,7 @@ class PresetGraph:
     def _vertex_gen_fn(self, _: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
-        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
+        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder, **self.generator_args)
         if not generator.data_exists:
             generator.create_data()
             generator.save_data()
@@ -106,7 +104,7 @@ class PresetGraph:
     @property
     def graph_data(self) -> GraphData:
         """Returns the vertices/weights/edges of the graph in "raw" form, e.g. for use with another PresetGen."""
-        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
+        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder, **self.generator_args)
         if not generator.data_exists:
             generator.create_data()
             generator.save_data()
@@ -126,7 +124,7 @@ class PresetGraph:
     def _weight_gen_fn(self, _: VertexSet, __: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
-        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
+        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder, **self.generator_args)
         if not generator.data_exists:
             generator.create_data()
             generator.save_data()
@@ -144,7 +142,7 @@ class PresetGraph:
     def _edge_gen_fn(self, _: WeightedVertexSet, __: np.random.Generator):
         # Note we throw away the RNG that comes from the calling SIExperiment, since whether or not it gets called
         # will depend on whether or not the graph data already exists.
-        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder)
+        generator = self.graph_generator_class(rng=self.rng, base_folder=self.base_folder, **self.generator_args)
         if not generator.data_exists:
             generator.create_data()
             generator.save_data()

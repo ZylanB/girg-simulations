@@ -5,7 +5,8 @@ import graph_tool.topology  # type: ignore
 import numpy as np
 
 import config
-from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph, GowallaGiantGraph
+from Gowalla import CheckIn, GowallaGen, GowallaGraph, SyntheticGowallaGraph, GowallaGiantGraph, GowallaEUGiantGraph
+from Region import Region, region_from_position
 from SIEpidemic import GenericEdgeCostGen, SIEpidemic
 from TestDistribution import dkw_p_value
 from PresetGraph import PresetGen, extract_giant_data
@@ -76,7 +77,8 @@ class GenerationTests(unittest.TestCase):
         clear_graph_files()
         cls.entropy = 89654657203871215244168134687054070552
         cls.rng = np.random.default_rng(cls.entropy)
-        cls.instance = GowallaGen(rng=cls.rng, base_folder=TEST_SAVE_FOLDER)
+        cls.instance = GowallaGen(rng=cls.rng, base_folder=TEST_SAVE_FOLDER,
+                                  regions={Region.US, Region.EU, Region.OTHER})
         cls.instance.create_data()
         cls.instance.save_data()
 
@@ -133,7 +135,7 @@ class GenerationTests(unittest.TestCase):
         for i in range(50):
             self.assertEqual((6., 7.), self.instance._get_user_position(check_ins)[0])
 
-    def test_position_calcuation_ties(self):
+    def test_position_calculation_ties(self):
         # Should return (53, 27) half the time and (69, 11) the rest of the time.
         check_ins = [
             CheckIn(user_id=432, time=datetime.datetime.now(), latitude=53., longitude=27., location_id=0),
@@ -159,12 +161,12 @@ class GenerationTests(unittest.TestCase):
             return 0.
 
         p_value = dkw_p_value(sample_data=location_counts, pmf=target_pmf, tvd_bound=0.01)
-        self.assertEqual(6.137472530978548e-09, p_value)
+        self.assertEqual(5.449004968975069e-09, p_value)
 
     def test_save_load(self):
         cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should load the Gowalla dataset we just saved. If it doesn't, the result will differ due to different seeds.
-        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER, regions={Region.US, Region.EU, Region.OTHER})
         test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
                                                       rng=np.random.default_rng(seed=self.entropy))
         self.check_against_instance(test_epidemic)
@@ -184,8 +186,9 @@ class GenerationTests(unittest.TestCase):
         cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
         # Should recreate the Gowalla dataset with the same RNG seed as in setup, then save it, then load it.
         clear_graph_files()
-        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
-        new_instance = GowallaGen(rng=np.random.default_rng(seed=self.entropy), base_folder=TEST_SAVE_FOLDER)
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER, regions={Region.US, Region.EU, Region.OTHER})
+        new_instance = GowallaGen(rng=np.random.default_rng(seed=self.entropy), base_folder=TEST_SAVE_FOLDER,
+                                  regions={Region.US, Region.EU, Region.OTHER})
         new_instance.create_data()
         new_instance.save_data()
         test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
@@ -218,7 +221,7 @@ class GowallaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cost_gen = GenericEdgeCostGen(lambda _: 0, "Zero cost")
-        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER)
+        gowalla_graph = GowallaGraph(base_folder=TEST_SAVE_FOLDER, regions={Region.US, Region.EU, Region.OTHER})
         test_epidemic = gowalla_graph.create_epidemic(cost_gen=cost_gen, mu=1., zeta=2., name="test",
                                                       rng=np.random.default_rng())
         cls.vertex_set = test_epidemic.vertex_set
@@ -249,8 +252,8 @@ class GowallaTests(unittest.TestCase):
         # spherical geometry into account). The easy way to tell this is to notice that a lot of users have multiple
         # check-ins from *exactly* the same location, which would be functionally impossible due to measurement error
         # if the dataset weren't discretised.
-        self.assertGreater(self.vertex_set.size - len(self.vertex_set.positions), 15000)
-        self.assertLess(self.vertex_set.size - len(self.vertex_set.positions), 20000)
+        self.assertGreater(self.vertex_set.count - len(self.vertex_set.positions), 15000)
+        self.assertLess(self.vertex_set.count - len(self.vertex_set.positions), 20000)
 
     def test_specific_position(self):
         user_id = 21
@@ -290,13 +293,13 @@ class SyntheticGowallaTests(unittest.TestCase):
         syn_gowalla = SyntheticGowallaGraph(base_folder=TEST_SAVE_FOLDER)
         data = syn_gowalla.graph_data
 
-        self.assertEqual(data.vertex_set.size, 249659)
-        self.assertEqual(len(data.edge_list), 10881354)
+        self.assertEqual(data.vertex_set.count, 999317)
+        self.assertEqual(len(data.edge_list), 43506309)
 
-        # This should already be connected, so extract_giant_data should do nothing.
+        # This should already pass to the giant component, so extract_giant_data should do nothing.
         data = syn_gowalla.graph_data
         giant_giant_data = extract_giant_data(data)
-        self.assertEqual(giant_giant_data.vertex_set.size, 96953)
+        self.assertEqual(giant_giant_data.vertex_set.count, data.vertex_set.count)
         self.assertEqual(giant_giant_data.weights, data.weights)
         self.assertEqual(giant_giant_data.edge_list, data.edge_list)
 
@@ -308,20 +311,40 @@ class GowallaGiantTests(unittest.TestCase):
     def tearDown(self):
         clear_graph_files()
 
-    def test_parameters(self):
+    def test_eu_parameters(self):
+        data = GowallaEUGiantGraph(base_folder=TEST_SAVE_FOLDER).graph_data
+        self.assertEqual(data.vertex_set.count, 34638)
+        self.assertEqual(len(data.edge_list), 133325)
+
+        for position in data.vertex_set.positions:
+            self.assertEqual(region_from_position(position), Region.EU)
+
+        # This should already be connected, so extract_giant_data should do nothing.
+        giant_giant_data = extract_giant_data(data)
+        self.assertEqual(giant_giant_data.vertex_set.count, data.vertex_set.count)
+        self.assertEqual(giant_giant_data.weights, data.weights)
+        self.assertEqual(giant_giant_data.edge_list, data.edge_list)
+
+    def test_main_parameters(self):
         """Make sure we're picking the right component."""
         data = GowallaGiantGraph(base_folder=TEST_SAVE_FOLDER).graph_data
 
         # Note agreement with GowallaTests.test_parameters for these tests.
-        self.assertEqual(data.vertex_set.size, 96953)
+        self.assertEqual(data.vertex_set.count, 96953)
         self.assertEqual(len(data.edge_list), 455026)
         self.assertEqual(data.vertex_set.name_to_position(164), (49.514555, 11.4177007667))
 
         # This should already be connected, so extract_giant_data should do nothing.
         giant_giant_data = extract_giant_data(data)
-        self.assertEqual(giant_giant_data.vertex_set.size, 96953)
+        self.assertEqual(giant_giant_data.vertex_set.count, data.vertex_set.count)
         self.assertEqual(giant_giant_data.weights, data.weights)
         self.assertEqual(giant_giant_data.edge_list, data.edge_list)
 
 if __name__ == '__main__':
     unittest.main()
+
+    # suite = unittest.TestSuite()
+    # suite.addTest(GowallaGiantTests("test_main_parameters"))
+    # suite.addTest(GowallaGiantTests("test_eu_parameters"))
+    # runner = unittest.TextTestRunner()
+    # runner.run(suite)

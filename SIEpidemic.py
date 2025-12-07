@@ -58,7 +58,7 @@ class SIEpidemic:
         self.name = name
 
         self.graph = gt.Graph(directed=False)
-        self.graph.add_vertex(n=self.vertex_set.size)
+        self.graph.add_vertex(n=self.vertex_set.count)
         self.edge_costs = self.graph.new_edge_property("double")
         self.graph.edge_properties["edge_costs"] = self.edge_costs
 
@@ -264,7 +264,7 @@ class SIEpidemic:
 
         vertices = WeightedVertexSet.load_from_config(path=folder / return_value.vertex_config_filename, rng=rng)
         return_value.vertex_set = vertices
-        return_value.graph.add_vertex(n=vertices.size)
+        return_value.graph.add_vertex(n=vertices.count)
         return_value.sample_edges(rng)
         return_value.sample_edge_costs(rng)
 
@@ -337,12 +337,12 @@ class GirgGen(EdgeGen):
     def _sample_edges(vertex_set: WeightedVertexSet, rng: np.random.Generator, alpha: float, scale_factor: float,
                       average_degree: Optional[float]) -> List[Tuple[Any, Any]]:
         seed = rng.integers(low=0, high=2 ** 31)  # girg-sampling takes 31-bit seeds, "high" is not inclusive.
-        weights = [vertex_set.weight(i) for i in range(vertex_set.size)]
+        weights = [vertex_set.weight(i) for i in range(vertex_set.count)]
 
         """The GIRG generator creates a GIRG with connection probability between u and v given by max(1, 
         W_uW_v/n|u-v|^d)^alpha. It also requires all points to lie in [0,1]^d. So we need to scale everything down 
         by a factor of n^{1/d}."""
-        positions = [vertex_set.id_to_position(i) for i in range(vertex_set.size)]
+        positions = [vertex_set.id_to_position(i) for i in range(vertex_set.count)]
         scaled_positions = []
         for position in positions:
             scaled_position = [position[i] * scale_factor for i in range(vertex_set.dimension)]

@@ -117,7 +117,7 @@ class PowerLawWeightGen(WeightGen):
         and using the specified RNG, then applies the given scaling map to each weight."""
         # The upper bound isn't included in the range, so this samples a 31-bit integer to pass to Cython.
         C_seed = rng.integers(low=0, high=2 ** 31)
-        weights = gs.generateWeights(n=vertices.size, ple=tau, seed=C_seed)
+        weights = gs.generateWeights(n=vertices.count, ple=tau, seed=C_seed)
         curried_scaler = lambda weight: scaling(weight, rng)
         if type(scaling) is not IdentityWeightScaler:
             efficient_ell = np.vectorize(curried_scaler)
