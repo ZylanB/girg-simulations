@@ -205,9 +205,7 @@ def generate_plot(graph_data: GraphData, edge_cutoffs: Tuple[float, float]):
     # The log of estimator_y (what we want to plot) is a line down from (log xmin, log ymin) with slope -xi.
     # So log(estimator_y) = log(y_0) - xi(log(x) - log(x_0)). So estimator_y = y_0(x_0/x)^xi.
     estimator_y = [ymin * (float(xmin) / k) ** ccdf_exp for k in x]
-    # wtf_y = [ymin * (float(xmin) / k) ** (SYN_GOWALLA_TAU-1) for k in x]
     axes.plot(x, estimator_y, color=colours.RED, linewidth=3, linestyle="dashed", dash_capstyle="round")
-    # axes.plot(x, wtf_y, color=colours.LIGHT_BLUE, linewidth=3, linestyle="dashed", dash_capstyle="round")
     axes.plot((x[-1]), estimator_y[-1], linestyle="none", marker="o", markerfacecolor="none",
               markeredgecolor=colours.RED, markeredgewidth=3, markersize=20)
 
@@ -221,4 +219,4 @@ def generate_plot(graph_data: GraphData, edge_cutoffs: Tuple[float, float]):
 
 
 def generate_figure():
-    generate_plot(graph_data=GowallaGiantGraph().graph_data, edge_cutoffs=(10, 100))
+    generate_plot(graph_data=GowallaGiantGraph().graph_data, edge_cutoffs=(20, 100))
