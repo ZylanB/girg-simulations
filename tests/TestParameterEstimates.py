@@ -116,30 +116,26 @@ class TestSynGowallaParameters(unittest.TestCase):
         degrees = get_degree_sequence(self.graph_data)
         hill_coefficients = get_hill_coefficients(degrees)
         xi, kappa, tau = hill_coefficients.xi, hill_coefficients.kappa, hill_coefficients.tau
-        print("Tau tuple: ", xi, kappa, tau)
-        # self.assertEqual(xi, 0.5618395953389204)
-        # self.assertEqual(kappa, 1484)
-        # self.assertEqual(tau, 2.779867436001492)
-        # self.assertEqual(SYN_GOWALLA_TAU, 2.78)
+        self.assertEqual(xi, 0.5618395953389204)
+        self.assertEqual(kappa, 1484)
+        self.assertEqual(tau, 2.779867436001492)
+        self.assertEqual(SYN_GOWALLA_TAU, 2.78)
 
     def test_alpha(self):
         entropy = 17280729670412610446175544547045928942
         rng = np.random.default_rng(seed=entropy)
 
         results = alpha_estimate_data(graph_data=self.graph_data, edge_cutoffs=(5, 100), rng=rng)
-        print(results.alpha, results.deviation)
-        # self.assertEqual(results.alpha, 1.1935975507367773)
-        # self.assertEqual(results.deviation, 7.274817243000555e-05)
+        self.assertEqual(results.alpha, 1.1935975507367773)
+        self.assertEqual(results.deviation, 7.274817243000555e-05)
 
         results = alpha_estimate_data(graph_data=self.graph_data, edge_cutoffs=(10, 100), rng=rng)
-        print(results.alpha, results.deviation)
-        # self.assertEqual(results.alpha, 1.2268393669325883)
-        # self.assertEqual(results.deviation, 5.362516236634198e-05)
+        self.assertEqual(results.alpha, 1.2268393669325883)
+        self.assertEqual(results.deviation, 5.362516236634198e-05)
 
         results = alpha_estimate_data(graph_data=self.graph_data, edge_cutoffs=(20, 100), rng=rng)
-        print(results.alpha, results.deviation)
-        # self.assertEqual(results.alpha, 1.1961463488211799)
-        # self.assertEqual(results.deviation, 0.0001319665165339359)
+        self.assertEqual(results.alpha, 1.1961463488211799)
+        self.assertEqual(results.deviation, 0.0001319665165339359)
 
         self.assertEqual(SYN_GOWALLA_ALPHA, 1.2)
 
