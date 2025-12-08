@@ -9,6 +9,7 @@ from scipy.optimize import curve_fit
 import config
 import figures.colours as colours
 from figures.tail_estimation import add_uniform_noise, get_ccdf, hill_estimator
+from Gowalla import GowallaGiantGraph
 from PresetGraph import GraphData
 
 SEED = 7272300  # Obtained from np.random.SeedSequence().entropy & (2**32 - 1).
