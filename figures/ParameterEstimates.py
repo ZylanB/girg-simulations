@@ -148,8 +148,11 @@ def alpha_estimate_data(graph_data: GraphData, edge_cutoffs: Tuple[float, float]
 
 
 def plot_inset(graph_data: GraphData, edge_cutoffs: Tuple[float, float]):
+    entropy = 87830759957948721258624078455704374391
+    rng = np.random.default_rng(entropy)
+
     # Get data to plot
-    inset_data = alpha_estimate_data(graph_data=graph_data, edge_cutoffs=edge_cutoffs)
+    inset_data = alpha_estimate_data(graph_data=graph_data, edge_cutoffs=edge_cutoffs, rng=rng)
     edge_ccdf_x, edge_ccdf_y = inset_data.edge_ccdf_x, inset_data.edge_ccdf_y
     edge_regression_x, edge_regression_y = edge_ccdf_x, inset_data.edge_regression_y
     alpha = inset_data.alpha
