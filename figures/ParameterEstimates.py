@@ -131,6 +131,7 @@ def alpha_estimate_data(graph_data: GraphData, edge_cutoffs: Tuple[float, float]
     # Downsample before running the curve fit so it runs in a reasonable amount of time
     sample_count = min(100000, edge_ccdf_x.size)
     sample_indices = rng.choice(edge_ccdf_x.size, size=sample_count, replace=False)
+    sample_indices.sort()
     sample_edge_ccdf_x, sample_edge_ccdf_y =  edge_ccdf_x[sample_indices], edge_ccdf_y[sample_indices]
 
     d = graph_data.vertex_set.dimension
@@ -219,4 +220,4 @@ def generate_plot(graph_data: GraphData, edge_cutoffs: Tuple[float, float]):
 
 
 def generate_figure():
-    generate_plot(graph_data=GowallaGiantGraph().graph_data, edge_cutoffs=(20, 100))
+    generate_plot(graph_data=GowallaGiantGraph().graph_data, edge_cutoffs=(5, 100))
