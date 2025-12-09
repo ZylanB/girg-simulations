@@ -33,9 +33,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import config
+from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph
 from Region import Region, region_from_position
-from SIEpidemic import SIEpidemic
+from SIEpidemic import SIEpidemic, FPPCostGen
 from VertexSet import TorusDistance
+
+# TODO move these into config or Gowalla.py
+from EpidemicCurvesConfig import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 
 
 class HeatMapMode(Enum):
@@ -156,20 +160,33 @@ class EpidemicHeatMap:
         plt.savefig(save_path)
 
 
-def generate_real_plot(mu, zeta, pixels_per_side, path):
-    # TODO Load Gowalla and run an SIEpidemic with mu and zeta (inline).
-    # TODO Remove non-Europe vertices (inline).
-    # TODO Instantiate a EpidemicHeatMap in Europe mode and call export_to_canvas.
-    pass
+# TODO Plots need to be square and of equal size
+def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Generator):
+    graph = GowallaGiantGraph()
+    cost_gen = FPPCostGen(lambda_=1)
+    epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
+    epidemic.run_infection(initial_vertex_id=GOWALLA_INITIAL)
+
+    # TODO Remove non-Europe vertices before getting heatmap.
+
+    heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE)
+    heatmap.export_to_canvas(path)
 
 
-def generate_syn_plot(mu, zeta, pixels, path):
-    # TODO Load SynGowalla and run an SIEpidemic with mu and zeta (inline).
-    # TODO Instantiate a EpidemicHeatMap in torus mode and call export_to_canvas.
-    pass
+def generate_syn_plot(mu: float, zeta: float, path: Path, rng: np.random.Generator):
+    graph = SyntheticGowallaGraph()
+    cost_gen = FPPCostGen(lambda_=1)
+    epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
+    epidemic.run_infection(initial_vertex_id=SYN_GOWALLA_INITIAL)
+
+    heatmap = EpidemicHeatMap(x_pixels=500, y_pixels=500, epidemic=epidemic, mode=HeatMapMode.TORUS)
+    heatmap.export_to_canvas(path)
 
 
 def generate_figures():
+    entropy = 281056517691655338767508099688269354802
+    rng = np.random.default_rng(entropy)
+
     parameter_list = [{"mu": 0, "zeta": 0}, {"mu": 1, "zeta": 1}, {"mu": 1, "zeta": 2}, {"mu": 1, "zeta": 3}]
 
     base_folder = config.FIGURE_FOLDER / "heatmaps"
@@ -177,7 +194,7 @@ def generate_figures():
         base_folder.mkdir(parents=True)
 
     for i, p in enumerate(parameter_list):
-        generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"real_heatmap_{i}.png")
-        generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png")
+        generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"real_heatmap_{i}.png", rng=rng)
+        generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
 
     # TODO Move collate_images out of EpidemicCurves into a common library then use it to bung these into a 4x2 grid.
