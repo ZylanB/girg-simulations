@@ -21,51 +21,152 @@ PLAN:
 Parameters should be: mu=zeta=0, mu=zeta=1, mu=1 and zeta=2, mu=1 and zeta=3. Arrange plots in a 4x2 rectangle
 with synthetic on top, this can be done as in EpidemicCurves.py.
 """
+from collections import defaultdict
+from enum import Enum
+from pathlib import Path
+from typing import DefaultDict, Tuple, Callable, Set, List
+
+import cartopy.crs as ccrs
+import cartopy.feature
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
 
 import config
+from Region import Region, region_from_position
+from SIEpidemic import SIEpidemic
+from VertexSet import TorusDistance
 
 
-class PixelBins:
-    # TODO This is the bit that gets unit-tested.
-    def __init__(self, x_min, x_max, x_bins, y_min, y_max, y_bins, representative_picker):
-        pass
+class HeatMapMode(Enum):
+    EUROPE = 1
+    TORUS = 2
 
-    def add_to_bin(self, position, datum):
-        pass
 
-    def load_bins(self, data):
-        pass
+class EpidemicHeatMap:
+    """This class turns data from 2d spatial epidemics into pretty heatmap images showing the spread of the
+    infection. Order: initialise, then call load_data, then call generate_heatmap, then call export_to_canvas."""
+    def __init__(self, x_pixels: int, y_pixels: int, mode: HeatMapMode, epidemic: SIEpidemic):
+        """
+        x_pixels and y_pixels control the resolution of the heatmap. NB if x_pixels/y_pixels is not equal to (x_max -
+        x_min)/(y_max - y_min) then the pixels won't be square.
 
-    def generate_heatmap(self):
-        # TODO Replace a list of data in each bin with a single datum using representative_picker (which is e.g.
-        #  min or median).
-        # TODO Map this onto colour scales using matplotlib.colors.LinearSegmentedColorMap.
-        pass
+        If mode == EUROPE then the heatmap will be rendered on a map of Europe in a LAEA projection, reading the vertex
+        co-ordinates as latitude-longitude pairs. Otherwise, mode == TORUS and the heatmap will be rendered on a blank
+        square.
+        """
 
-    def export_to_canvas(self):
-        # TODO saves heatmap on blank canvas with matplotlib with optional map background
-        pass
+        self.x_pixels = x_pixels
+        self.y_pixels = y_pixels
+        self.mode = mode
+        self.epidemic = epidemic
+
+        # self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
+        # in EUROPE mode it projects into LAEA (which represents areas accurately but not angles). (x_min, y_min)
+        # and (x_max, y_max) are the lower-left and upper-right corners of the area to be rendered in this coordinate
+        # system.
+        self.projection_map: Callable[[Tuple[float, float]], Tuple[float, float]]
+
+        if mode == HeatMapMode.EUROPE:
+            # These just need to be a box containing Europe that looks reasonable.
+            self.x_min = -12
+            self.y_min = 34
+            self.x_max = 35
+            self.y_max = 72
+            self.raw_projection = ccrs.LambertAzimuthalEqualArea(central_longitude=10, central_latitude=52)
+            plate = ccrs.PlateCarree()
+            self.projection_map = lambda x, y: self.raw_projection.transform_point(x=x, y=y, src_crs=plate)
+
+        elif mode == HeatMapMode.TORUS:
+            metric = epidemic.vertex_set.metric
+            if metric is not TorusDistance:
+                raise Exception("This epidemic isn't on a torus, but torus mode was selected.")
+            self.x_min = self.y_min = 0
+            self.x_max = self.y_max = metric.size
+            self.projection_map = lambda x, y: x
+
+        else:
+            raise Exception(f"Unsupported HeatMapMode {mode}.")
+
+        """ 
+        Let P_{i,j} be the i'th pixel from the left and the j'th pixel from the top of the heatmap, counting from 0.
+        For a pixel P, let t(P) be the earliest infection time among all vertices in P. heatmap_mesh[(i,j)] 
+        will contain the position of P_{i,j} in the list of all pixels when sorted under the key P |-> t(P). So the 
+        first pixel to be infected has pixel order 0, the second has pixel order 1, and so on. Ties will be broken 
+        arbitrarily, and pixels containing no vertices are set to -1. 
+        """
+        self.heatmap_mesh = self._get_heatmap_mesh()
+
+    def _get_heatmap_mesh(self) -> List[List[int]]:
+        """Initialises self.heatmap_mesh as specified in __init__."""
+
+        vertices = self.epidemic.vertex_set.vertices
+
+        if vertices.dimension != 2:
+            raise Exception("Only two-dimensional graphs are supported.")
+
+        # full_epidemic_data[(i,j)] will contain all infection times for vertices in the (i,j)'th pixel.
+        # Pixels containing no vertices are omitted.
+        full_epidemic_data: DefaultDict[Tuple[int, int], Set[float]] = defaultdict(set)
+        pixel_width = (self.x_max - self.x_min) / self.x_pixels
+        pixel_height = (self.y_max - self.y_min) / self.y_pixels
+
+        for position in vertices.positions:
+            europe_valid = self.mode == HeatMapMode.EUROPE and region_from_position(position) == Region.EU
+            torus_valid = self.mode == HeatMapMode.TORUS
+            if europe_valid or torus_valid:
+                x, y = self.projection_map(position[0], position[1])
+                i = (x - self.x_min) // pixel_width
+                j = (y - self.y_min) // pixel_height
+                infection_time = self.epidemic.infection_times[vertices.id_from_position(position)]
+                full_epidemic_data[(i, j)].add(infection_time)
+
+        # representative_data is a list of (i,j,time) tuples, where time is the earliest infection time of any vertex
+        # in the (i,j)'th pixel, sorted by time.
+        representative_data: List[Tuple[int, int, float]] = []
+        for pixel, times in full_epidemic_data.items():
+            representative_data.append((pixel[0], pixel[1], min(times)))
+        representative_data.sort(key=lambda d: d[2])
+
+        # We now read this back into self.heatmap_mesh to set it as specified, first initialising every value to -1.
+        heatmap_mesh = [[-1] * self.y_pixels for _ in range(self.x_pixels)]
+        for i, j, _, index in enumerate(representative_data):
+            heatmap_mesh[i][j] = index
+        return heatmap_mesh
+
+    def export_to_canvas(self, save_path: Path):
+        # NB The old figures used the jet colormap, which is deprecated these days because human eyes are weird.
+        cmap = mpl.colormaps['plasma']  # First infection = 0 = yellow -> purple -> blue = 1 = last infection
+        cmap.set_bad(alpha=0)  # Don't draw colours for masked values
+        masked_heatmap = np.ma.masked_array(self.heatmap_mesh, mask=-1)  # Mask out pixels with no data
+
+        fig = plt.figure(figsize=(8, 8))
+        if self.mode == HeatMapMode.TORUS:
+            ax = plt.axes()
+        elif self.mode == HeatMapMode.EUROPE:
+            # Draw map of Europe in background
+            ax = plt.axes(projection=self.raw_projection)
+            ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=ccrs.PlateCarree())
+            ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.8)
+            ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
+        else:
+            raise Exception(f"Unsupported HeatMapMode {self.mode}.")
+
+        ax.pcolormesh(self.heatmap_mesh, cmap=cmap)
+        plt.savefig(save_path)
 
 
 def generate_real_plot(mu, zeta, pixels_per_side, path):
     # TODO Load Gowalla and run an SIEpidemic with mu and zeta (inline).
     # TODO Remove non-Europe vertices (inline).
-    # TODO Instantiate a PixelBins with coordinates matching Europe (inline).
-    # TODO Load in data using PixelBins.load_bins, then generate the heatmap using PixelBins.generate_heatmap (inline).
-    # TODO Render the heatmap on a LAEA map of Europe using PixelBins.export_to_canvas and carto_py.
+    # TODO Instantiate a EpidemicHeatMap in Europe mode and call export_to_canvas.
     pass
 
 
 def generate_syn_plot(mu, zeta, pixels, path):
     # TODO Load SynGowalla and run an SIEpidemic with mu and zeta (inline).
-    # TODO Instantiate a PixelBins with a simple torus (inline).
-    # TODO Load in data using PixelBins.load_bins, then generate the heatmap using PixelBins.generate_heatmap (inline).
-    # TODO Render the heatmap on a blank canvas using PixelBins.export_to_canvas.
+    # TODO Instantiate a EpidemicHeatMap in torus mode and call export_to_canvas.
     pass
-
-
-# Probably the above two functions only generate the PixelBins to facilitate full unit testing with a toy epidemic.
-# Also probably PixelBins gets renamed to HeatMapCreator or similar.
 
 
 def generate_figures():
