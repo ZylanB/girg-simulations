@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Type
 
 from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph
+from figure_config import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 from PresetGraph import PresetGraph
 
 
@@ -43,12 +44,10 @@ PLOT_PRECISION = 4  # Increase to plot more points per graph.
 FILENAME_BASE = "epidemic-curve-"  # Start of plot filenames
 
 
-GOWALLA_INITIAL = 164
 GOWALLA_CUTOFF = 64635
 GOWALLA_XI_RANGE = (150, 5000)
 GOWALLA_PARAMS = {"graph": GowallaGiantGraph, "initial_name": GOWALLA_INITIAL, "infection_cutoff": GOWALLA_CUTOFF}
 SYN_GOWALLA_CUTOFF = 166667
-SYN_GOWALLA_INITIAL = 230563
 SYN_GOWALLA_XI_RANGE = (150, SYN_GOWALLA_CUTOFF)
 SYN_GOWALLA_PARAMS = {"graph": SyntheticGowallaGraph, "initial_name": SYN_GOWALLA_INITIAL,
                       "infection_cutoff": SYN_GOWALLA_CUTOFF}

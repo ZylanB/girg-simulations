@@ -38,8 +38,7 @@ from Region import Region, region_from_position
 from SIEpidemic import SIEpidemic, FPPCostGen
 from VertexSet import TorusDistance
 
-# TODO move these into config or Gowalla.py
-from EpidemicCurvesConfig import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
+from figure_config import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 
 
 class HeatMapMode(Enum):
