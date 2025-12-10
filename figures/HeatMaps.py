@@ -115,14 +115,15 @@ class EpidemicHeatMap:
         pixel_width = (self.x_max - self.x_min) / self.x_pixels
         pixel_height = (self.y_max - self.y_min) / self.y_pixels
 
-        for position in vertices.positions:
+        for id_ in vertices.ids:
+            position = vertices.id_to_position(id_)
             europe_valid = self.mode == HeatMapMode.EUROPE and region_from_position(position) == Region.EU
             torus_valid = self.mode == HeatMapMode.TORUS
             if europe_valid or torus_valid:
                 x, y = self.projection_map(position[0], position[1])
                 i = (x - self.x_min) // pixel_width
                 j = (y - self.y_min) // pixel_height
-                infection_time = self.epidemic.infection_times[vertices.id_from_position(position)]
+                infection_time = self.epidemic.infection_times[id_]
                 full_epidemic_data[(i, j)].add(infection_time)
 
         # representative_data is a list of (i,j,time) tuples, where time is the earliest infection time of any vertex
@@ -166,8 +167,6 @@ def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Genera
     cost_gen = FPPCostGen(lambda_=1)
     epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
     epidemic.run_infection(initial_vertex_id=GOWALLA_INITIAL)
-
-    # TODO Remove non-Europe vertices before getting heatmap.
 
     heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE)
     heatmap.export_to_canvas(path)
