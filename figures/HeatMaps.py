@@ -23,6 +23,7 @@ with synthetic on top, this can be done as in EpidemicCurves.py.
 """
 from collections import defaultdict
 from enum import Enum
+from math import floor
 from pathlib import Path
 from typing import DefaultDict, Tuple, Callable, Set, List
 
@@ -64,21 +65,23 @@ class EpidemicHeatMap:
         self.mode = mode
         self.epidemic = epidemic
 
-        # self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
-        # in EUROPE mode it projects into LAEA (which represents areas accurately but not angles). (x_min, y_min)
-        # and (x_max, y_max) are the lower-left and upper-right corners of the area to be rendered in this coordinate
-        # system.
+        """self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
+        in EUROPE mode it projects into LAEA (which represents areas accurately but not angles). (x_min, y_min)
+        and (x_max, y_max) are the lower-left and upper-right corners of the area to be rendered in this coordinate
+        system."""
         self.projection_map: Callable[[Tuple[float, float]], Tuple[float, float]]
 
         if mode == HeatMapMode.EUROPE:
-            # These just need to be a box containing Europe that looks reasonable.
-            self.x_min = -12
-            self.y_min = 34
-            self.x_max = 35
-            self.y_max = 72
             self.raw_projection = ccrs.LambertAzimuthalEqualArea(central_longitude=10, central_latitude=52)
             plate = ccrs.PlateCarree()
-            self.projection_map = lambda x, y: self.raw_projection.transform_point(x=x, y=y, src_crs=plate)
+            """No, this is not a bug. Cartopy orders points by (longitude, latitude), matching coordinate geometry.
+            The codebase (and haversine metric code) order points by (latitude, longitude), matching cartography.
+            So we do in fact need to reorder the coordinates."""
+            self.projection_map = lambda x, y: self.raw_projection.transform_point(x=y, y=x, src_crs=plate)
+            # These just need to be a box containing Europe that looks reasonable.
+            self.x_min, self.y_min = (-1700000, -1750000)
+            self.x_max, self.y_max = (2100000, 2200000)
+
 
         elif mode == HeatMapMode.TORUS:
             metric = epidemic.vertex_set.metric
@@ -93,7 +96,7 @@ class EpidemicHeatMap:
 
         """ 
         Let P_{i,j} be the i'th pixel from the left and the j'th pixel from the top of the heatmap, counting from 0.
-        For a pixel P, let t(P) be the earliest infection time among all vertices in P. heatmap_mesh[(i,j)] 
+        For a pixel P, let t(P) be the earliest infection time among all vertices in P. heatmap_mesh[j][i] 
         will contain the position of P_{i,j} in the list of all pixels when sorted under the key P |-> t(P). So the 
         first pixel to be infected has pixel order 0, the second has pixel order 1, and so on. Ties will be broken 
         arbitrarily, and pixels containing no vertices are set to -1. 
@@ -120,8 +123,10 @@ class EpidemicHeatMap:
             torus_valid = self.mode == HeatMapMode.TORUS
             if europe_valid or torus_valid:
                 x, y = self.projection_map(position[0], position[1])
-                i = (x - self.x_min) // pixel_width
-                j = (y - self.y_min) // pixel_height
+                i = floor((x - self.x_min) / pixel_width)
+                j = floor((y - self.y_min) / pixel_height)
+                if i >= self.x_pixels or j >= self.y_pixels:
+                    raise Exception("Position out of bounds, chosen projection doesn't display all vertices in Europe")
                 infection_time = self.epidemic.infection_times[id_]
                 full_epidemic_data[(i, j)].add(infection_time)
 
@@ -133,30 +138,36 @@ class EpidemicHeatMap:
         representative_data.sort(key=lambda d: d[2])
 
         # We now read this back into self.heatmap_mesh to set it as specified, first initialising every value to -1.
-        heatmap_mesh = [[-1] * self.y_pixels for _ in range(self.x_pixels)]
-        for i, j, _, index in enumerate(representative_data):
-            heatmap_mesh[i][j] = index
+        heatmap_mesh = [[-1] * self.x_pixels for _ in range(self.y_pixels)]
+        for index, (i, j, _) in enumerate(representative_data):
+            """Again, not a bug. Matplotlib wants heatmaps to use matrix notation, so the first coordinate is the
+            row and the second coordinate is the column. So we have to reverse coordinates *again*."""
+            heatmap_mesh[j][i] = index
         return heatmap_mesh
 
     def export_to_canvas(self, save_path: Path):
         # NB The old figures used the jet colormap, which is deprecated these days because human eyes are weird.
         cmap = mpl.colormaps['plasma']  # First infection = 0 = yellow -> purple -> blue = 1 = last infection
         cmap.set_bad(alpha=0)  # Don't draw colours for masked values
-        masked_heatmap = np.ma.masked_array(self.heatmap_mesh, mask=-1)  # Mask out pixels with no data
+        np_mesh = np.asarray(self.heatmap_mesh)
+        masked_heatmap = np.ma.masked_array(np_mesh, mask=(np_mesh == -1))  # Mask out pixels with no data
 
-        fig = plt.figure(figsize=(8, 8))
+        plt.figure(figsize=(8, 8))
         if self.mode == HeatMapMode.TORUS:
             ax = plt.axes()
+            ax.pcolormesh(masked_heatmap, cmap=cmap)
         elif self.mode == HeatMapMode.EUROPE:
             # Draw map of Europe in background
             ax = plt.axes(projection=self.raw_projection)
-            ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=ccrs.PlateCarree())
+            ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=self.raw_projection)
             ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.8)
             ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
+            x_mesh_points = np.linspace(self.x_min, self.x_max, self.x_pixels+1)
+            y_mesh_points = np.linspace(self.y_min, self.y_max, self.y_pixels+1)
+            ax.pcolormesh(x_mesh_points, y_mesh_points, masked_heatmap, cmap=cmap)
         else:
             raise Exception(f"Unsupported HeatMapMode {self.mode}.")
 
-        ax.pcolormesh(self.heatmap_mesh, cmap=cmap)
         plt.savefig(save_path)
 
 
@@ -193,6 +204,9 @@ def generate_figures():
 
     for i, p in enumerate(parameter_list):
         generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"real_heatmap_{i}.png", rng=rng)
-        generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
+        # generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
 
     # TODO Move collate_images out of EpidemicCurves into a common library then use it to bung these into a 4x2 grid.
+
+if __name__ == "__main__":
+    generate_figures()
