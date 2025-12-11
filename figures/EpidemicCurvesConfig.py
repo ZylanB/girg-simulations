@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Type
 
 from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph
-from figure_config import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
+from figures_common import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 from PresetGraph import PresetGraph
 
 

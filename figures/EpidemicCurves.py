@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.patches import ConnectionPatch
 import numpy as np
-from PIL import Image
 from sklearn.linear_model import LinearRegression
 
 import figures.colours as colours
@@ -18,7 +17,7 @@ from SIEpidemic import FPPCostGen, SIEpidemic
 from SIExperiment import FixedInitialVertex, ResultFunction, SIExperiment
 from figures.EpidemicCurvesConfig import (CurveParams, CURVE_PARAMS, FILENAME_BASE, PlotParams, PLOT_PARAMS,
                                           PLOT_PRECISION, RUN_COUNT, SEEDS)
-
+from figures.figures_common import collate_curves
 
 @dataclass
 class InfectionDatum:
@@ -285,28 +284,6 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
     plt.savefig(config.FIGURE_FOLDER / f"{FILENAME_BASE}{graph_no}.png", bbox_inches="tight", pad_inches=0.5)
 
 
-def collate_curves():
-    """ Combines all figures together into a square grid with four plots per row. Scales gracefully if the number of
-    plots changes. If plots are non-uniform in size, keeps the grid squares uniform in size and aligns each plot
-    to the left and bottom of its square."""
-    plot_count = len(CURVE_PARAMS)
-
-    paths = [config.FIGURE_FOLDER / f"{FILENAME_BASE}{x}.png" for x in range(plot_count)]
-    image_dimensions = [Image.open(path).size for path in paths]
-    max_width = max([dim[0] for dim in image_dimensions])
-    max_height = max([dim[1] for dim in image_dimensions])
-
-    canvas = Image.new("RGB", (4 * max_width, ceil(plot_count / 4) * max_height), (255, 255, 255))
-
-    for x, path in enumerate(paths):
-        row, column = x // 4, x % 4
-        image = Image.open(path)
-        _, height = image.size
-        canvas.paste(image, (column * max_width, row * max_height + (max_height - height)))
-
-    canvas.save(config.FIGURE_FOLDER / f"{FILENAME_BASE}combined.png")
-
-
 def generate_figures():
     if len(CURVE_PARAMS) != len(SEEDS) or len(CURVE_PARAMS) != len(PLOT_PARAMS):
         raise RuntimeError("Mismatched plot parameters!")
@@ -322,7 +299,8 @@ def generate_figures():
         plot_curve(PLOT_PARAMS[i], epidemic_curves, i)
 
     print("Combining plots...")
-    collate_curves()
+    figure_paths = [config.FIGURE_FOLDER / f"{FILENAME_BASE}{i}.png" for i in range(len(CURVE_PARAMS))]
+    collate_curves(output_path = config.FIGURE_FOLDER / f"{FILENAME_BASE}combined.png", figure_paths=figure_paths)
 
 
 if __name__ == '__main__':

@@ -38,9 +38,32 @@ from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph
 from Region import Region, region_from_position
 from SIEpidemic import SIEpidemic, FPPCostGen
 from VertexSet import TorusDistance
+from figures.figures_common import collate_curves, GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 
-from figure_config import GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 
+def get_map_to_torus(centre_x: float, centre_y: float, side: float) \
+        -> Callable[[float, float], Tuple[float, float]]:
+    """Returns a projection mapping a point (x,y) into the torus of width and height side centered at
+    (centre_x, centre_y)."""
+    def projection(x, y):
+        new_x = (x - centre_x + side/2) % side
+        new_y = (y - centre_y + side/2) % side
+        return new_x, new_y
+    return projection
+
+
+def get_map_to_europe(centre_lat: float, centre_long: float) -> Callable[[float, float], Tuple[float, float]]:
+    """Returns a projection mapping a point (lat, long)  onto an azimuthal equidistant map with (x, y) coordinates.
+    This projection preserves distances and angles from the initial point of infection, allowing for easy observation
+    of spread."""
+    plate = ccrs.PlateCarree()
+    raw_projection = ccrs.AzimuthalEquidistant(central_latitude=centre_lat, central_longitude=centre_long)
+    def projection(lat, long):
+        """No, this is not a bug. Cartopy orders points by (longitude, latitude), matching coordinate geometry.
+        The codebase (and haversine metric code) order points by (latitude, longitude), matching cartography.
+        So we do in fact need to reorder the coordinates."""
+        return raw_projection.transform_point(x=long, y=lat, src_crs=plate)
+    return projection
 
 class HeatMapMode(Enum):
     EUROPE = 1
@@ -66,30 +89,27 @@ class EpidemicHeatMap:
         self.epidemic = epidemic
 
         """self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
-        in EUROPE mode it projects into LAEA (which represents areas accurately but not angles). (x_min, y_min)
-        and (x_max, y_max) are the lower-left and upper-right corners of the area to be rendered in this coordinate
-        system."""
-        self.projection_map: Callable[[Tuple[float, float]], Tuple[float, float]]
+        in EUROPE mode it projects into azimuthal equidistant (which represents distances and angles accurately from
+        the initial infection). (x_min, y_min) and (x_max, y_max) are the lower-left and upper-right corners of the 
+        area to be rendered in this coordinate system."""
+        self.projection_map: Callable[[float, float], Tuple[float, float]]
 
         if mode == HeatMapMode.EUROPE:
-            self.raw_projection = ccrs.LambertAzimuthalEqualArea(central_longitude=10, central_latitude=52)
-            plate = ccrs.PlateCarree()
-            """No, this is not a bug. Cartopy orders points by (longitude, latitude), matching coordinate geometry.
-            The codebase (and haversine metric code) order points by (latitude, longitude), matching cartography.
-            So we do in fact need to reorder the coordinates."""
-            self.projection_map = lambda x, y: self.raw_projection.transform_point(x=y, y=x, src_crs=plate)
+            origin_lat, origin_long = epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
+            self.projection_map = get_map_to_europe(centre_lat=origin_lat, centre_long=origin_long)
             # These just need to be a box containing Europe that looks reasonable.
-            self.x_min, self.y_min = (-1700000, -1750000)
-            self.x_max, self.y_max = (2100000, 2200000)
+            self.x_min, self.y_min = (-1900000, -1500000)
+            self.x_max, self.y_max = (2000000, 2500000)
 
 
         elif mode == HeatMapMode.TORUS:
             metric = epidemic.vertex_set.metric
-            if metric is not TorusDistance:
+            if type(metric) is not TorusDistance:
                 raise Exception("This epidemic isn't on a torus, but torus mode was selected.")
-            self.x_min = self.y_min = 0
-            self.x_max = self.y_max = metric.size
-            self.projection_map = lambda x, y: x
+            self.x_min = self.y_min = -metric.size/2
+            self.x_max = self.y_max = metric.size/2
+            origin_x, origin_y = epidemic.vertex_set.name_to_position(SYN_GOWALLA_INITIAL)
+            self.projection_map = get_map_to_torus(centre_x=origin_x, centre_y=origin_y, side=metric.size)
 
         else:
             raise Exception(f"Unsupported HeatMapMode {mode}.")
@@ -147,36 +167,41 @@ class EpidemicHeatMap:
 
     def export_to_canvas(self, save_path: Path):
         # NB The old figures used the jet colormap, which is deprecated these days because human eyes are weird.
-        cmap = mpl.colormaps['plasma']  # First infection = 0 = yellow -> purple -> blue = 1 = last infection
+        cmap = mpl.colormaps['plasma_r']  # First infection = 0 = yellow -> purple -> blue = 1 = last infection
         cmap.set_bad(alpha=0)  # Don't draw colours for masked values
         np_mesh = np.asarray(self.heatmap_mesh)
         masked_heatmap = np.ma.masked_array(np_mesh, mask=(np_mesh == -1))  # Mask out pixels with no data
 
-        plt.figure(figsize=(8, 8))
+        plt.figure(figsize=(8, 8), dpi=600)
+        x_mesh_points = np.linspace(self.x_min, self.x_max, self.x_pixels + 1)
+        y_mesh_points = np.linspace(self.y_min, self.y_max, self.y_pixels + 1)
+
         if self.mode == HeatMapMode.TORUS:
-            ax = plt.axes()
-            ax.pcolormesh(masked_heatmap, cmap=cmap)
+            ax = plt.axes((.05, .05, .9, .9))
+            ax.pcolormesh(x_mesh_points, y_mesh_points, masked_heatmap, cmap=cmap)
+            ax.set_axis_off()
         elif self.mode == HeatMapMode.EUROPE:
             # Draw map of Europe in background
-            ax = plt.axes(projection=self.raw_projection)
-            ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=self.raw_projection)
-            ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.8)
-            ax.add_feature(cartopy.feature.BORDERS, linewidth=0.5)
-            x_mesh_points = np.linspace(self.x_min, self.x_max, self.x_pixels+1)
-            y_mesh_points = np.linspace(self.y_min, self.y_max, self.y_pixels+1)
+            origin_lat, origin_long = self.epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
+            raw_projection = ccrs.AzimuthalEquidistant(central_latitude=origin_lat, central_longitude=origin_long)
+            ax = plt.axes((.05, .05, .9, .9), projection=raw_projection)
+            ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=raw_projection)
+            ax.add_feature(cartopy.feature.COASTLINE, linewidth=0.6)
+            ax.add_feature(cartopy.feature.BORDERS, linewidth=0.4)
             ax.pcolormesh(x_mesh_points, y_mesh_points, masked_heatmap, cmap=cmap)
+            centre_x, centre_y = self.projection_map(origin_lat, origin_long)
+            ax.plot(centre_x, centre_y, marker='x', markersize=15, color='green')
         else:
             raise Exception(f"Unsupported HeatMapMode {self.mode}.")
 
-        plt.savefig(save_path)
+        plt.savefig(save_path, dpi=600)
 
 
-# TODO Plots need to be square and of equal size
 def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Generator):
     graph = GowallaGiantGraph()
     cost_gen = FPPCostGen(lambda_=1)
     epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
-    epidemic.run_infection(initial_vertex_id=GOWALLA_INITIAL)
+    epidemic.run_infection(initial_vertex_id=epidemic.vertex_set.name_to_id(GOWALLA_INITIAL))
 
     heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE)
     heatmap.export_to_canvas(path)
@@ -188,7 +213,7 @@ def generate_syn_plot(mu: float, zeta: float, path: Path, rng: np.random.Generat
     epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
     epidemic.run_infection(initial_vertex_id=SYN_GOWALLA_INITIAL)
 
-    heatmap = EpidemicHeatMap(x_pixels=500, y_pixels=500, epidemic=epidemic, mode=HeatMapMode.TORUS)
+    heatmap = EpidemicHeatMap(x_pixels=400, y_pixels=400, epidemic=epidemic, mode=HeatMapMode.TORUS)
     heatmap.export_to_canvas(path)
 
 
@@ -204,9 +229,11 @@ def generate_figures():
 
     for i, p in enumerate(parameter_list):
         generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"real_heatmap_{i}.png", rng=rng)
-        # generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
+        generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
 
-    # TODO Move collate_images out of EpidemicCurves into a common library then use it to bung these into a 4x2 grid.
+    real_paths = [base_folder / f"real_heatmap_{i}.png" for i in range(4)]
+    syn_paths = [base_folder / f"syn_heatmap_{i}.png" for i in range(4)]
+    collate_curves(output_path=base_folder / "combined_heatmaps.png", figure_paths=syn_paths + real_paths)
 
 if __name__ == "__main__":
     generate_figures()
