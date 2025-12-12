@@ -83,8 +83,8 @@ class EpidemicHeatMap:
             metric = epidemic.vertex_set.metric
             if type(metric) is not TorusDistance:
                 raise Exception("This epidemic isn't on a torus, but torus mode was selected.")
-            self.x_min = self.y_min = 0, metric.size
-            self.x_max = self.y_max = 0, metric.size
+            self.x_min = self.y_min = 0
+            self.x_max = self.y_max = metric.size
             origin_x, origin_y = epidemic.vertex_set.name_to_position(SYN_GOWALLA_INITIAL)
             self.projection_map = get_map_to_torus(centre_x=origin_x, centre_y=origin_y, side=metric.size)
 
