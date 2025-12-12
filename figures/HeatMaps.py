@@ -23,8 +23,8 @@ def get_map_to_torus(centre_x: float, centre_y: float, side: float) \
     """Returns a projection mapping a point (x,y) into the torus of width and height side centered at
     (centre_x, centre_y)."""
     def projection(x, y):
-        new_x = (x - centre_x + side/2) % side
-        new_y = (y - centre_y + side/2) % side
+        new_x = (x - centre_x + side/2) % side - side/2
+        new_y = (y - centre_y + side/2) % side - side/2
         return new_x, new_y
     return projection
 
@@ -50,7 +50,8 @@ class HeatMapMode(Enum):
 class EpidemicHeatMap:
     """This class turns data from 2d spatial epidemics into pretty heatmap images showing the spread of the
     infection. Order: initialise, then call load_data, then call generate_heatmap, then call export_to_canvas."""
-    def __init__(self, x_pixels: int, y_pixels: int, mode: HeatMapMode, epidemic: SIEpidemic):
+    def __init__(self, x_pixels: int, y_pixels: int, mode: HeatMapMode, epidemic: SIEpidemic, origin_x: float,
+                 origin_y: float):
         """
         x_pixels and y_pixels control the resolution of the heatmap. NB if x_pixels/y_pixels is not equal to (x_max -
         x_min)/(y_max - y_min) then the pixels won't be square.
@@ -72,8 +73,7 @@ class EpidemicHeatMap:
         self.projection_map: Callable[[float, float], Tuple[float, float]]
 
         if mode == HeatMapMode.EUROPE:
-            origin_lat, origin_long = epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
-            self.projection_map = get_map_to_europe(centre_lat=origin_lat, centre_long=origin_long)
+            self.projection_map = get_map_to_europe(centre_lat=origin_y, centre_long=origin_x)
             # These just need to be a box containing Europe that looks reasonable.
             self.x_min, self.y_min = (-1900000, -1500000)
             self.x_max, self.y_max = (2000000, 2500000)
@@ -83,9 +83,8 @@ class EpidemicHeatMap:
             metric = epidemic.vertex_set.metric
             if type(metric) is not TorusDistance:
                 raise Exception("This epidemic isn't on a torus, but torus mode was selected.")
-            self.x_min = self.y_min = 0
-            self.x_max = self.y_max = metric.size
-            origin_x, origin_y = epidemic.vertex_set.name_to_position(SYN_GOWALLA_INITIAL)
+            self.x_min = self.y_min = -metric.size/2
+            self.x_max = self.y_max = metric.size/2
             self.projection_map = get_map_to_torus(centre_x=origin_x, centre_y=origin_y, side=metric.size)
 
         else:
@@ -181,7 +180,9 @@ def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Genera
     epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
     epidemic.run_infection(initial_vertex_id=epidemic.vertex_set.name_to_id(GOWALLA_INITIAL))
 
-    heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE)
+    origin_lat, origin_long = epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
+    heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE,
+                              origin_x=origin_long, origin_y=origin_lat)
     heatmap.export_to_canvas(path)
 
 
@@ -191,7 +192,9 @@ def generate_syn_plot(mu: float, zeta: float, path: Path, rng: np.random.Generat
     epidemic = graph.create_epidemic(cost_gen=cost_gen, mu=mu, zeta=zeta, name=path.name, rng=rng)
     epidemic.run_infection(initial_vertex_id=SYN_GOWALLA_INITIAL)
 
-    heatmap = EpidemicHeatMap(x_pixels=400, y_pixels=400, epidemic=epidemic, mode=HeatMapMode.TORUS)
+    origin_x, origin_y = epidemic.vertex_set.name_to_position(SYN_GOWALLA_INITIAL)
+    heatmap = EpidemicHeatMap(x_pixels=400, y_pixels=400, epidemic=epidemic, mode=HeatMapMode.TORUS, origin_x=origin_x,
+                              origin_y=origin_y)
     heatmap.export_to_canvas(path)
 
 
