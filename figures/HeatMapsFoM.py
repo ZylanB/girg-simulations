@@ -5,7 +5,7 @@ import numpy as np
 import config
 from HeatMaps import HeatMapMode, EpidemicHeatMap
 from SIEpidemic import GirgGen, FPPCostGen, SIEpidemic
-from VertexSet import PoissonPointProcess
+from VertexSet import Lattice
 from WeightedVertexSet import PowerLawWeightGen, IdentityWeightScaler, WeightedVertexSet
 
 
@@ -15,7 +15,7 @@ def generate_plot(mu: float, path: Path):
 
     print(f"Plotting mu={mu}.")
     print("Generating vertex set...")
-    vertex_gen = PoissonPointProcess(dimension=2, size=750)
+    vertex_gen = Lattice(dimension=2, size=750)
     weight_gen = PowerLawWeightGen(tau=2.3, ell=IdentityWeightScaler())
     vertex_set = WeightedVertexSet(vertex_gen=vertex_gen, weight_gen=weight_gen, rng=rng)
 
@@ -28,7 +28,9 @@ def generate_plot(mu: float, path: Path):
     epidemic.run_infection(initial_vertex_id=0)
 
     print("Generating heatmap...")
-    heatmap = EpidemicHeatMap(x_pixels=300, y_pixels=300, epidemic=epidemic, mode=HeatMapMode.TORUS)
+    origin_x, origin_y = epidemic.vertex_set.id_to_position(0)
+    heatmap = EpidemicHeatMap(x_pixels=750, y_pixels=750, epidemic=epidemic, mode=HeatMapMode.TORUS, origin_x=origin_x,
+                              origin_y=origin_y)
     print("Saving heatmap...")
     heatmap.export_to_canvas(path)
     print("Done!")
