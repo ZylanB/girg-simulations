@@ -1,26 +1,3 @@
-"""
-PLAN:
-1. Run an infection on real/synthetic Gowalla with given parameters.
-2. For real Gowalla, throw away vertices outside the desired plot area.
-3. Iterate over vertices to divide pixels into equal-size buckets by region.
-    - Synthetic: Buckets are equal-side squares in the torus.
-    - Real: Buckets are equal-area regions in Europe, which can't be squares because projection. (The old code uses
-      projection.) Easiest way seems to be using cartopy: transform the latitude/longitude points into Lambert
-      azimuthal equal-area projection (which preserves area but not angles) using cartopy.crs.CRS.transform_points
-      with a cartopy.crs.PlateCarree as the first argument. This gives you x/y pairs on the area-respecting projection,
-      so then we can bin as normal.
-   Both synthetic and real ultimately use buckets that are equal-size squares on a 2d plane, so that part of the code
-   should be common - the real Gowalla code should just transform the coordinates first.
-4. Process the info from #1 and #2 into colours for a heatmap by picking a representative infection time, ordering
-   the buckets according to that representative, then going blue -> green -> red. Representative should be configurable,
-   probably we want first infection but might as well check median/average too. Old code uses matplotlib.colors for
-   this, LinearSegmentedColormap, results look good so let's do the same.
-5. Project the heatmap onto a map of Europe for real and a square for synthetic. Old code uses a random map for this,
-   cartopy looks easier and less copyright infringement-y (and allows for accurate pixels).
-
-Parameters should be: mu=zeta=0, mu=zeta=1, mu=1 and zeta=2, mu=1 and zeta=3. Arrange plots in a 4x2 rectangle
-with synthetic on top, this can be done as in EpidemicCurves.py.
-"""
 from collections import defaultdict
 from enum import Enum
 from math import floor
@@ -106,8 +83,8 @@ class EpidemicHeatMap:
             metric = epidemic.vertex_set.metric
             if type(metric) is not TorusDistance:
                 raise Exception("This epidemic isn't on a torus, but torus mode was selected.")
-            self.x_min = self.y_min = -metric.size/2
-            self.x_max = self.y_max = metric.size/2
+            self.x_min = self.y_min = 0, metric.size
+            self.x_max = self.y_max = 0, metric.size
             origin_x, origin_y = epidemic.vertex_set.name_to_position(SYN_GOWALLA_INITIAL)
             self.projection_map = get_map_to_torus(centre_x=origin_x, centre_y=origin_y, side=metric.size)
 
