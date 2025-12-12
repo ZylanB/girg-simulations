@@ -172,7 +172,7 @@ class EpidemicHeatMap:
         np_mesh = np.asarray(self.heatmap_mesh)
         masked_heatmap = np.ma.masked_array(np_mesh, mask=(np_mesh == -1))  # Mask out pixels with no data
 
-        plt.figure(figsize=(8, 8), dpi=600)
+        plt.figure(figsize=(8, 8), dpi=1200)
         x_mesh_points = np.linspace(self.x_min, self.x_max, self.x_pixels + 1)
         y_mesh_points = np.linspace(self.y_min, self.y_max, self.y_pixels + 1)
 
@@ -194,7 +194,8 @@ class EpidemicHeatMap:
         else:
             raise Exception(f"Unsupported HeatMapMode {self.mode}.")
 
-        plt.savefig(save_path, dpi=600)
+        plt.savefig(save_path, dpi=1200)
+        plt.savefig(save_path.with_suffix(".eps"), dpi=1200, format="eps")
 
 
 def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Generator):
