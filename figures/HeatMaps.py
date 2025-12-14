@@ -56,15 +56,17 @@ class EpidemicHeatMap:
         x_pixels and y_pixels control the resolution of the heatmap. NB if x_pixels/y_pixels is not equal to (x_max -
         x_min)/(y_max - y_min) then the pixels won't be square.
 
-        If mode == EUROPE then the heatmap will be rendered on a map of Europe in a LAEA projection, reading the vertex
-        co-ordinates as latitude-longitude pairs. Otherwise, mode == TORUS and the heatmap will be rendered on a blank
-        square.
+        If mode == EUROPE then the heatmap will be rendered on a map of Europe in a LAEA projection, reading the
+        vertex co-ordinates as latitude-longitude pairs and with the origin marked by an X. Otherwise, mode == TORUS
+        and the heatmap will be rendered on a blank square, centered at the given origin.
         """
 
         self.x_pixels = x_pixels
         self.y_pixels = y_pixels
         self.mode = mode
         self.epidemic = epidemic
+        self.origin_x = origin_x
+        self.origin_y = origin_y
 
         """self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
         in EUROPE mode it projects into azimuthal equidistant (which represents distances and angles accurately from
@@ -74,7 +76,9 @@ class EpidemicHeatMap:
 
         if mode == HeatMapMode.EUROPE:
             self.projection_map = get_map_to_europe(centre_lat=origin_y, centre_long=origin_x)
-            # These just need to be a box containing Europe that looks reasonable.
+            """These just need to be a box containing Europe that looks reasonable. Warning: These numbers depend on
+            GOWALLA_INITIAL (which is the center of the projection) and will need changing to avoid a crash or poorly-
+            centred map if GOWALLA_INITIAL changes."""
             self.x_min, self.y_min = (-1900000, -1500000)
             self.x_max, self.y_max = (2000000, 2500000)
 
@@ -158,7 +162,7 @@ class EpidemicHeatMap:
             ax.set_axis_off()
         elif self.mode == HeatMapMode.EUROPE:
             # Draw map of Europe in background
-            origin_lat, origin_long = self.epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
+            origin_lat, origin_long = self.origin_y, self.origin_x
             raw_projection = ccrs.AzimuthalEquidistant(central_latitude=origin_lat, central_longitude=origin_long)
             ax = plt.axes((.05, .05, .9, .9), projection=raw_projection)
             ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=raw_projection)
