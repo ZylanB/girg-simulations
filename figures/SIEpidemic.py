@@ -9,6 +9,7 @@ import graph_tool as gt  # type: ignore
 from graph_tool.topology import shortest_distance  # type: ignore
 import numpy as np
 
+from Region import Region, region_from_position
 from LoggableFunction import LoggableFunction
 from WeightedVertexSet import WeightedVertexSet, FixedWeightGen
 from VertexSet import Lattice
@@ -123,8 +124,25 @@ class SIEpidemic:
         self.infection_times.set_value(np.inf)
         self.infectors.set_value(-1)
 
+        shortest_distance(g=self.graph, source=self.initial_vertex, weights=self.graph.edge_properties["edge_costs"],
+                          dist_map=self.graph.vertex_properties["infection_times"], pred_map=self.graph.vertex_properties["infectors"])
+
+    def run_infection_on_area(self, initial_vertex_id: int, region: Region, rng: np.random.Generator):
+        filter = self.graph.new_vertex_property("bool")
+        for vertex in self.graph.vertices():
+            if region_from_position(self.vertex_set.id_to_position(vertex)) == region:
+                filter[vertex] = True
+        self.graph = gt.GraphView(self.graph,filter)
+    
+        print("Running infection on specified region...")
+        self.initial_vertex = self.graph.vertex(initial_vertex_id)
+
+        # Distances need to be initialised to infinity before running graph-tools' Dijkstra implementation.
+        self.infection_times.set_value(np.inf)
+        self.infectors.set_value(-1)
         shortest_distance(g=self.graph, source=self.initial_vertex, weights=self.edge_costs,
                           dist_map=self.infection_times, pred_map=self.infectors)
+
 
     @property
     def is_infected(self) -> gt.VertexPropertyMap:

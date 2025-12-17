@@ -8,6 +8,7 @@ import cartopy.crs as ccrs
 import cartopy.feature
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 
 import config
@@ -15,7 +16,7 @@ from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph
 from Region import Region, region_from_position
 from SIEpidemic import SIEpidemic, FPPCostGen
 from VertexSet import TorusDistance
-from figures.figures_common import collate_curves, GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
+from figures_common import collate_curves, GOWALLA_INITIAL, SYN_GOWALLA_INITIAL
 
 
 def get_map_to_torus(centre_x: float, centre_y: float, side: float) \
@@ -56,17 +57,15 @@ class EpidemicHeatMap:
         x_pixels and y_pixels control the resolution of the heatmap. NB if x_pixels/y_pixels is not equal to (x_max -
         x_min)/(y_max - y_min) then the pixels won't be square.
 
-        If mode == EUROPE then the heatmap will be rendered on a map of Europe in a LAEA projection, reading the
-        vertex co-ordinates as latitude-longitude pairs and with the origin marked by an X. Otherwise, mode == TORUS
-        and the heatmap will be rendered on a blank square, centered at the given origin.
+        If mode == EUROPE then the heatmap will be rendered on a map of Europe in a LAEA projection, reading the vertex
+        co-ordinates as latitude-longitude pairs. Otherwise, mode == TORUS and the heatmap will be rendered on a blank
+        square.
         """
 
         self.x_pixels = x_pixels
         self.y_pixels = y_pixels
         self.mode = mode
         self.epidemic = epidemic
-        self.origin_x = origin_x
-        self.origin_y = origin_y
 
         """self.projection_map will be applied to all positions before processing them. In TORUS mode it does nothing,
         in EUROPE mode it projects into azimuthal equidistant (which represents distances and angles accurately from
@@ -76,9 +75,7 @@ class EpidemicHeatMap:
 
         if mode == HeatMapMode.EUROPE:
             self.projection_map = get_map_to_europe(centre_lat=origin_y, centre_long=origin_x)
-            """These just need to be a box containing Europe that looks reasonable. Warning: These numbers depend on
-            GOWALLA_INITIAL (which is the center of the projection) and will need changing to avoid a crash or poorly-
-            centred map if GOWALLA_INITIAL changes."""
+            # These just need to be a box containing Europe that looks reasonable.
             self.x_min, self.y_min = (-1900000, -1500000)
             self.x_max, self.y_max = (2000000, 2500000)
 
@@ -160,9 +157,10 @@ class EpidemicHeatMap:
             ax = plt.axes((.05, .05, .9, .9))
             ax.pcolormesh(x_mesh_points, y_mesh_points, masked_heatmap, cmap=cmap)
             ax.set_axis_off()
-        elif self.mode == HeatMapMode.EUROPE:
+            generate_animation(x_mesh_points,y_mesh_points,masked_heatmap,cmap,save_path)
+        elif self.mode == HeatMapMode.EUROPE: 
             # Draw map of Europe in background
-            origin_lat, origin_long = self.origin_y, self.origin_x
+            origin_lat, origin_long = self.epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
             raw_projection = ccrs.AzimuthalEquidistant(central_latitude=origin_lat, central_longitude=origin_long)
             ax = plt.axes((.05, .05, .9, .9), projection=raw_projection)
             ax.set_extent([self.x_min, self.x_max, self.y_min, self.y_max], crs=raw_projection)
@@ -175,7 +173,7 @@ class EpidemicHeatMap:
             raise Exception(f"Unsupported HeatMapMode {self.mode}.")
 
         plt.savefig(save_path, dpi=1200)
-        plt.savefig(save_path.with_suffix(".eps"), dpi=1200, format="eps")
+        #plt.savefig(save_path.with_suffix(".eps"), dpi=1200, format="eps")
 
 
 def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Generator):
@@ -213,12 +211,66 @@ def generate_figures():
         base_folder.mkdir(parents=True)
 
     for i, p in enumerate(parameter_list):
-        generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"real_heatmap_{i}.png", rng=rng)
+        generate_real_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
         generate_syn_plot(mu=p["mu"], zeta=p["zeta"], path=base_folder / f"syn_heatmap_{i}.png", rng=rng)
 
     real_paths = [base_folder / f"real_heatmap_{i}.png" for i in range(4)]
     syn_paths = [base_folder / f"syn_heatmap_{i}.png" for i in range(4)]
     collate_curves(output_path=base_folder / "combined_heatmaps.png", figure_paths=syn_paths + real_paths)
+
+def generate_animation(x_mesh_points, y_mesh_points, masked_heatmap, cmap, save_path):
+    print("Generating Animation...")
+    cells_per_frame = 1000
+    interval = 100
+    fps = 30
+
+    Ny, Nx = masked_heatmap.shape
+    flat = masked_heatmap.ravel()
+    # start fully masked
+    current = np.ma.masked_all(flat.shape)
+
+    cmap_copy = cmap.copy()
+    cmap_copy.set_bad('white')
+
+    sorted_idx = np.argsort(flat)
+    sorted_idx = sorted_idx[~np.isnan(flat)]
+    n_frames = int(np.ceil(len(sorted_idx) / cells_per_frame))
+
+    fig = plt.figure()
+    ax = plt.axes((.05, .05, .9, .9))
+    # initial masked 2D array
+    initial_array = np.ma.masked_all((Ny, Nx))
+    mesh = ax.pcolormesh(
+        x_mesh_points,
+        y_mesh_points,
+        initial_array,
+        cmap=cmap_copy,
+        shading='auto'
+    )
+    mesh.set_clim(np.nanmin(masked_heatmap), np.nanmax(masked_heatmap))
+    ax.set_axis_off()
+
+    def update(frame):
+        start = frame * cells_per_frame
+        end = min(start + cells_per_frame, len(sorted_idx))
+        idx = sorted_idx[start:end]
+        rows = idx // Nx
+        cols = idx % Nx
+        current[idx] = flat[idx]  # unmask new cells
+        mesh.set_array(current)
+        return mesh,
+
+    ani = animation.FuncAnimation(
+        fig,
+        update,
+        frames=n_frames,
+        interval=interval,
+        blit=True
+    )
+
+    ani.save(save_path + ".mp4", writer="ffmpeg", fps=fps, dpi=600)
+
+
 
 if __name__ == "__main__":
     generate_figures()

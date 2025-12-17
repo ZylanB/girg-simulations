@@ -13,10 +13,10 @@ SEEDS = [
     303903392100660574452661293122954292079,
     207575285627819734050983420268628288457,
     336827387627079923696399650174942918686,
-    175837567687085788645530192316345259609,
-    233657882610370377508087340942845579878,
-    139102178419114034645107386879574426047,
-    90012362361482529980268819803967658146
+    #175837567687085788645530192316345259609,
+    #233657882610370377508087340942845579878,
+    #139102178419114034645107386879574426047,
+    #90012362361482529980268819803967658146
 ]
 
 
@@ -28,6 +28,7 @@ class CurveParams:
     infection_cutoff: int     # The saturation point at which we stop considering new infections.
     mu: float                 # Degree penalisation parameter (see WeightedVertexSet.penalty).
     zeta: float               # Spatial penalisation parameter (see WeightedVertexSet.penalty).
+    
 
 
 @dataclass
@@ -39,7 +40,7 @@ class PlotParams:
     psi_inset_infection_range: Optional[Tuple[int, int]]
 
 
-RUN_COUNT = 55      # Number of infections to simulate per graph.
+RUN_COUNT = 55  # Number of infections to simulate per graph.
 PLOT_PRECISION = 4  # Increase to plot more points per graph.
 FILENAME_BASE = "epidemic-curve-"  # Start of plot filenames
 
@@ -53,23 +54,19 @@ SYN_GOWALLA_PARAMS = {"graph": SyntheticGowallaGraph, "initial_name": SYN_GOWALL
                       "infection_cutoff": SYN_GOWALLA_CUTOFF}
 CURVE_PARAMS = [
     CurveParams(**GOWALLA_PARAMS, mu=0.0, zeta=0.0),
-    CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=0.0),
+    CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=1.0),
     CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=2.0),
     CurveParams(**GOWALLA_PARAMS, mu=1.0, zeta=3.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=0.0, zeta=0.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=1.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=2.0),
-    CurveParams(**SYN_GOWALLA_PARAMS, mu=1.0, zeta=3.0)
 ]
 
 
 PLOT_PARAMS = [
     PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
     PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
-    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
-    PlotParams(log_t=True, psi_inset_infection_range=GOWALLA_XI_RANGE, region_inset=True),
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
-    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
-    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False),
-    PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False)
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
+    PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=True),
+    #PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
+    #PlotParams(log_t=False, psi_inset_infection_range=None, region_inset=False),
+    #PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False),
+    #PlotParams(log_t=True, psi_inset_infection_range=SYN_GOWALLA_XI_RANGE, region_inset=False)
 ]

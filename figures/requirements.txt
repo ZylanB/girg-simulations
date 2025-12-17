@@ -1,0 +1,10 @@
+dill~=0.3.9
+haversine~=2.8.1
+matplotlib~=3.9.2
+numpy~=1.26.4
+requests~=2.32.4
+scipy~=1.14.1
+cartopy~=0.24.1
+shapely~=2.1.1
+scikit-learn~=1.7.0
+pillow~=11.3.0

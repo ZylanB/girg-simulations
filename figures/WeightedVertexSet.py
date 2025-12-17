@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Mapping, List, Sequence
 
 import dill  # type: ignore
-import py_girgs_2.girg_sampling.girgs as gs  # type: ignore
+import py_girgs_2.girg_sampling.girgs as gs # type: ignore
 import numpy as np
 
 from LoggableFunction import LoggableFunction

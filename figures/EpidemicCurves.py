@@ -10,14 +10,15 @@ from matplotlib.patches import ConnectionPatch
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-import figures.colours as colours
+from pathlib import Path
+import colours as colours
 import config
 from Region import Region, region_from_position
 from SIEpidemic import FPPCostGen, SIEpidemic
 from SIExperiment import FixedInitialVertex, ResultFunction, SIExperiment
-from figures.EpidemicCurvesConfig import (CurveParams, CURVE_PARAMS, FILENAME_BASE, PlotParams, PLOT_PARAMS,
+from EpidemicCurvesConfig import (CurveParams, CURVE_PARAMS, FILENAME_BASE, PlotParams, PLOT_PARAMS,
                                           PLOT_PRECISION, RUN_COUNT, SEEDS)
-from figures.figures_common import collate_curves
+from figures_common import collate_curves
 
 @dataclass
 class InfectionDatum:
@@ -89,7 +90,7 @@ def generate_data(params: CurveParams, seed: int, name: str) -> List[RunDatum]:
 
     if experiment.results_exist:
         print("Loading from file...")
-        return experiment.load_results()
+        return experiment.load_results() 
 
     experiment.execute()
     return experiment.results
@@ -268,6 +269,8 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
     plt.yscale("log", base=10)
     if params.log_t:
         plt.xscale("log", base=10)
+    
+    plt.ticklabel_format(axis='x', style='sci',scilimits=(0,0))
 
     # Median as a bold line, with shaded error region between top and bottom curve.
     plt.plot(curve_data.median_curve, curve_data.i_points, linewidth=2)
@@ -276,13 +279,14 @@ def plot_curve(params: PlotParams, curve_data: EpidemicCurveData, graph_no: int)
     plt.fill_betweenx(curve_data.i_points, curve_data.top_curve, curve_data.bottom_curve, color=colours.LIGHT_BLUE)
 
     # Plot insets if needed.
+    
     if params.psi_inset_infection_range is not None:
         plot_psi_inset(curve_data=curve_data, infection_range=params.psi_inset_infection_range)
     if params.region_inset:
         plot_region_inset(curve_data=curve_data, log_t=params.log_t)
 
     plt.savefig(config.FIGURE_FOLDER / f"{FILENAME_BASE}{graph_no}.png", bbox_inches="tight", pad_inches=0.5)
-
+    
 
 def generate_figures():
     if len(CURVE_PARAMS) != len(SEEDS) or len(CURVE_PARAMS) != len(PLOT_PARAMS):
