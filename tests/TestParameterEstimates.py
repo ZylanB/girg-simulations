@@ -79,7 +79,7 @@ class TestAlphaRegression(unittest.TestCase):
 
 
     def helper_test_alpha(self, entropy: int, lower_cutoff: float, expected_alpha: float, expected_deviation: float):
-        """Generates a million-vertex synthetic GIRG wiith the given entropy and vertex size (so vertex count is
+        """Generates a million-vertex synthetic GIRG with the given entropy and vertex size (so vertex count is
         vertex_size^2), estimates alpha for it, and compares it against the expected result."""
         rng = np.random.default_rng(seed=entropy)
         vertex_gen = PoissonPointProcess(dimension=2, size=1000)
