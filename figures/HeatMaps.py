@@ -80,7 +80,7 @@ class EpidemicHeatMap:
             GOWALLA_INITIAL (which is the center of the projection) and will need changing to avoid a crash or poorly-
             centred map if GOWALLA_INITIAL changes."""
             self.x_min, self.y_min = (-1900000, -1500000)
-            self.x_max, self.y_max = (2000000, 2500000)
+            self.x_max, self.y_max = (1300000, 1700000)
 
 
         elif mode == HeatMapMode.TORUS:
@@ -117,6 +117,7 @@ class EpidemicHeatMap:
         pixel_width = (self.x_max - self.x_min) / self.x_pixels
         pixel_height = (self.y_max - self.y_min) / self.y_pixels
 
+        nodes_out_of_bounds = 0
         for id_ in vertices.ids:
             position = vertices.id_to_position(id_)
             europe_valid = self.mode == HeatMapMode.EUROPE and region_from_position(position) == Region.EU
@@ -126,9 +127,12 @@ class EpidemicHeatMap:
                 i = floor((x - self.x_min) / pixel_width)
                 j = floor((y - self.y_min) / pixel_height)
                 if i >= self.x_pixels or j >= self.y_pixels:
-                    raise Exception("Position out of bounds, chosen projection doesn't display all vertices in Europe")
+                    nodes_out_of_bounds += 1
+                    continue
                 infection_time = self.epidemic.infection_times[id_]
                 full_epidemic_data[(i, j)].add(infection_time)
+        if nodes_out_of_bounds > vertices.count / 100:
+            raise Exception("Chosen projection displays <99% of all vertices in Europe.")
 
         # representative_data is a list of (i,j,time) tuples, where time is the earliest infection time of any vertex
         # in the (i,j)'th pixel, sorted by time.
@@ -185,7 +189,7 @@ def generate_real_plot(mu: float, zeta: float, path: Path, rng: np.random.Genera
     epidemic.run_infection(initial_vertex_id=epidemic.vertex_set.name_to_id(GOWALLA_INITIAL))
 
     origin_lat, origin_long = epidemic.vertex_set.name_to_position(GOWALLA_INITIAL)
-    heatmap = EpidemicHeatMap(x_pixels=460, y_pixels=370, epidemic=epidemic, mode=HeatMapMode.EUROPE,
+    heatmap = EpidemicHeatMap(x_pixels=400, y_pixels=400, epidemic=epidemic, mode=HeatMapMode.EUROPE,
                               origin_x=origin_long, origin_y=origin_lat)
     heatmap.export_to_canvas(path)
 
