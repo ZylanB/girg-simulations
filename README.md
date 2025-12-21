@@ -47,7 +47,7 @@ growth regimes in degree-dependent first passage percolation on spatial random g
 Lapinskas, Johannes Lengler and Ulysse Schaller.
 
 **ParameterEstimates.py:** Estimates tau and alpha parameters for the synthetic Gowalla network from the actual Gowalla
-network as discussed in our paper.
+network as discussed in our paper. Also contains code for Figure S8 in the SI.
 
 The code in the "tests" folder is a suite of unit tests to ensure the rest of the code behaves as expected. In 
 particular, some of our random generation code uses unit tests based around the DKW inequality to ensure the resulting

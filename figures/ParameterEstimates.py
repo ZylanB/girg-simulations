@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import pi
 from typing import Sequence, Tuple
 
 import graph_tool.all as gt
@@ -9,7 +10,7 @@ from scipy.optimize import curve_fit
 import config
 import figures.colours as colours
 from figures.tail_estimation import add_uniform_noise, get_ccdf, hill_estimator
-from Gowalla import GowallaGiantGraph
+from Gowalla import GowallaGiantGraph, SyntheticGowallaGraph, SYN_GOWALLA_ALPHA, SYN_GOWALLA_TAU
 from PresetGraph import GraphData
 
 SEED = 7272300  # Obtained from np.random.SeedSequence().entropy & (2**32 - 1).
@@ -78,9 +79,6 @@ def get_edge_ccdf(graph_data: GraphData, edge_cutoffs: Tuple[float, float]) -> T
     y[i] = #(edges with length in [x[i], ec[1]]) / #(edges with length in [ec[0], ec[1]])"""
 
     vertex_set, edge_list = graph_data.vertex_set, graph_data.edge_list
-
-    if edge_cutoffs[0] < 1:
-        raise Exception("The model we're fitting to is completely invalid for edges with length less than 1.")
 
     # Convert the list of edges into a list of edge lengths.
     u_list = [a for [a, _] in edge_list]
@@ -219,5 +217,74 @@ def generate_plot(graph_data: GraphData, edge_cutoffs: Tuple[float, float]):
     plt.savefig(config.FIGURE_FOLDER / "gowalla-tail-estimates.png")
 
 
-def generate_figure():
+def generate_figures():
     generate_plot(graph_data=GowallaGiantGraph().graph_data, edge_cutoffs=(5, 100))
+    generate_si_figure_a()
+    generate_si_figure_a()
+
+
+def generate_si_figure_a():
+    graph_data = SyntheticGowallaGraph().graph_data
+
+    # Get data to plot
+    edge_ccdf_x, edge_ccdf_y = get_edge_ccdf(graph_data, (0, 1500))
+
+    plt.rcParams['font.size'] = 18
+    plt.figure("alpha-si", figsize=(9, 7), dpi=300)
+
+    # Log plot the CCDF of the edge lengths in km alongside its linear regression.
+    plt.grid(visible=True)
+    plt.xscale("log", base=10)
+    plt.yscale("log", base=10)
+    plt.xlim(1, 10 ** 3)
+    plt.ylim(.001, 1)
+    plt.step(edge_ccdf_x, edge_ccdf_y, linewidth=6, color=colours.BLUE)
+
+    bad_estimate_x = edge_ccdf_x
+    bad_estimate_y = [edge_ccdf_y[0]] + [edge_ccdf_y[0]*(x ** (2 * (1 - SYN_GOWALLA_ALPHA))) for x in bad_estimate_x[1:]]
+    plt.plot(bad_estimate_x, bad_estimate_y, linewidth=6, color=colours.RED, linestyle="dashed",
+             dash_capstyle="round", dashes=(3, 2))
+
+    plt.savefig(config.FIGURE_FOLDER / "si-alpha-no-truncation.png", dpi=300)
+    plt.show()
+
+
+def generate_si_figure_b():
+    graph_data = SyntheticGowallaGraph().graph_data
+    rng = np.random.default_rng(seed=150193521694919731486647101218528564890)
+
+    # Get data to plot
+    inset_data = alpha_estimate_data(graph_data=graph_data, edge_cutoffs=(10, 500), rng=rng)
+    edge_ccdf_x, edge_ccdf_y = inset_data.edge_ccdf_x, inset_data.edge_ccdf_y
+
+    tau, alpha = SYN_GOWALLA_TAU, SYN_GOWALLA_ALPHA
+    c_1 = 2*pi*(tau-1)**2 / ((tau-1-alpha)**2 * 2 * (alpha-1))
+
+    plt.rcParams['font.size'] = 18
+    plt.figure("alpha-si", figsize=(9, 7), dpi=300)
+
+    # Log plot the CCDF of the edge lengths in km alongside its linear regression.
+    plt.grid(visible=True)
+    plt.xscale("log", base=10)
+    plt.yscale("log", base=10)
+    plt.xlim(1, 10 ** 3)
+    plt.ylim(.001, 1)
+    plt.step(edge_ccdf_x, edge_ccdf_y, linewidth=6, color=colours.BLUE)
+
+    good_estimate_x = edge_ccdf_x
+    exponent = 2*(1-alpha)
+    # good_estimate_y = [1000 * c_1 * (x**exponent - 500**exponent) / len(edge_ccdf_x) for x in good_estimate_x]
+    y_0 = 10 ** exponent - 500 ** exponent
+    good_estimate_y = [(x ** exponent - 500 ** exponent) / y_0 for x in good_estimate_x]
+    plt.plot(good_estimate_x, good_estimate_y, linewidth=3, color=colours.RED, linestyle="dashed",
+             dash_capstyle="round", dashes=(3, 2))
+
+    # plt.figtext(0.1875, 0.1375, rf"$\hat\alpha={np.round(alpha, 3)}$,\quad$\alpha={SYN_GOWALLA_ALPHA}$")
+    plt.savefig(config.FIGURE_FOLDER / "si-alpha-truncation.png", dpi=300)
+    plt.show()
+
+
+if __name__ == "__main__":
+    # generate_si_figure_a()
+    generate_si_figure_b()
+    # generate_figures()
